@@ -26,7 +26,8 @@
 [Visual Diagrams & Images](#-visual-diagrams--image-generation) •
 [Security & IaC SAST](#-security--iac-static-analysis) •
 [AI Architectural Reviews](#-ai-architectural-reviews-ollama--qwen) •
-[CLI Reference](#-cli-reference)
+[CLI Reference](#-cli-reference) •
+[Contributing](CONTRIBUTING.md)
 
 ---
 
@@ -388,6 +389,14 @@ python -m unittest
 Ran 97 tests in 6.933s
 OK
 ```
+
+---
+
+## 🤝 Contributing & AI Agent Guidelines
+
+- **Contributing Guide**: See [`CONTRIBUTING.md`](CONTRIBUTING.md) for local setup, development workflows, testing, coding standards, and PR submission guidelines.
+- **AI Agent Guidelines**: See [`AGENTS.md`](AGENTS.md) for automated agent operating instructions, security boundaries, and determinism constraints.
+- **Security Policy**: See [`CONTRIBUTING.md#reporting-security-vulnerabilities`](CONTRIBUTING.md#-reporting-security-vulnerabilities) for confidential vulnerability reporting.
 
 ---
 

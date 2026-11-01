@@ -34,10 +34,10 @@ jobs:
     name: Build image & scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
       - name: Build image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           platforms: linux/amd64
@@ -51,7 +51,7 @@ jobs:
       # Report-only: the bundled Node.js/Mermaid CLI layer can carry upstream
       # base-image CVEs that cannot be fixed from this repository.
       - name: Trivy image scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: gitdiagram:ci
           scanners: vuln,secret
@@ -62,7 +62,7 @@ jobs:
           ignore-unfixed: true
       - name: Upload Trivy SARIF
         if: always() && hashFiles('trivy-image.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: trivy-image.sarif
           category: trivy-image

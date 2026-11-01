@@ -1,0 +1,119 @@
+# ==============================================================================
+# Byte-compiled / optimized / DLL files
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ==============================================================================
+# Distribution / packaging
+# ==============================================================================
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+*.whl
+
+# ==============================================================================
+# Virtual environments
+# ==============================================================================
+.env/
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ==============================================================================
+# gitdiagram generated artifacts & analysis outputs
+# ==============================================================================
+.gitdiagram/
+test_docker_out/
+diagram_out/
+artifacts/
+NARRATIVE.md
+ARCHITECTURE.md
+graph.json
+diagram.mmd
+diagram.png
+diagram.svg
+diagram.pdf
+security.sarif
+*.sarif
+
+# ==============================================================================
+# Unit test & coverage artifacts
+# ==============================================================================
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# ==============================================================================
+# Environment variables, credentials & secrets
+# ==============================================================================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# ==============================================================================
+# Docker & Ollama local persistent state
+# ==============================================================================
+ollama_data/
+*.tar
+*.log
+
+# ==============================================================================
+# IDEs & Editor workspaces
+# ==============================================================================
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+*~
+
+# ==============================================================================
+# OS metadata files
+# ==============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini

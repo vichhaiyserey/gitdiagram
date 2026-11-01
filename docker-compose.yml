@@ -1,0 +1,35 @@
+services:
+  gitdiagram:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: gitdiagram:latest
+    container_name: gitdiagram
+    volumes:
+      # Mount current workspace/repository into the container
+      - .:/repo
+    environment:
+      - GITDIAGRAM_LLM_BASE_URL=http://ollama:11434/v1
+      - GITDIAGRAM_LLM_TIMEOUT=600
+    depends_on:
+      - ollama
+    networks:
+      - gitdiagram-net
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: gitdiagram-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - gitdiagram-net
+
+networks:
+  gitdiagram-net:
+    driver: bridge
+
+volumes:
+  ollama_data:

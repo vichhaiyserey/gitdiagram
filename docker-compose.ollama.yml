@@ -1,0 +1,23 @@
+# Docker Compose setup for local Ollama with GitDiagram
+#
+# 1. Start Ollama container:
+#    docker compose -f docker-compose.ollama.yml up -d
+#
+# 2. Pull Qwen (e.g. qwen2.5-coder):
+#    docker exec -it ollama ollama pull qwen2.5-coder
+#
+# 3. Run gitdiagram with Ollama:
+#    python gitdiagram.py --dir . --ollama qwen2.5-coder
+#
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+
+volumes:
+  ollama_data:

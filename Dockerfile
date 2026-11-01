@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 
 # Stage 1: Install Mermaid CLI in official Node.js image
-FROM node:20-slim AS mermaid-builder
+FROM node:26-slim AS mermaid-builder
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 RUN npm install -g @mermaid-js/mermaid-cli@11.4.2 \
     && npm cache clean --force
 
 # Stage 2: Final runtime image
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 # Labels following OCI specifications
 LABEL org.opencontainers.image.title="gitdiagram" \

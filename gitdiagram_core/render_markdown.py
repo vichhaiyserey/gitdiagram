@@ -75,7 +75,11 @@ def _flows(graph: Graph, endpoints: list[Node], node_by_id: dict[str, Node], lim
     return lines
 
 
-def render_markdown(graph: Graph, meta: dict[str, Any] | None = None) -> str:
+def render_markdown(
+    graph: Graph,
+    meta: dict[str, Any] | None = None,
+    high_level_mermaid: str | None = None,
+) -> str:
     graph.dedupe_edges()
     meta = dict(meta or {})
     nodes = graph.sorted_nodes()
@@ -102,6 +106,15 @@ def render_markdown(graph: Graph, meta: dict[str, Any] | None = None) -> str:
         f"**{len(graph.features)}** features | **{len(graph.findings)}** security findings"
     )
     lines.append("")
+
+    if high_level_mermaid:
+        lines.append("## System architecture overview (high-level)")
+        lines.append("")
+        lines.append("```mermaid")
+        lines.append(high_level_mermaid.strip())
+        lines.append("```")
+        lines.append("")
+
     lines.append(
         "Every claim below is derived from the Python AST. Edges carry a confidence score and "
         "a `path:line` citation; unresolved dynamic calls are counted, not guessed."

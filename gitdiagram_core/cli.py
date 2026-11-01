@@ -9,6 +9,7 @@ from pathlib import Path
 
 from . import __version__
 from .analyzer import AnalysisConfig, run_analysis
+from .high_level import build_high_level_architecture, render_mermaid_highlevel
 from .llm import NarrativeError, generate_narrative
 from .model import SEVERITY_RANK
 from .render_json import render_json
@@ -174,9 +175,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--diagram-detail",
-        choices=["architecture", "full"],
+        choices=["architecture", "full", "high-level", "overview"],
         default="architecture",
-        help="diagram detail level: architecture (clean, human-friendly), full (every symbol) (default: architecture)",
+        help="diagram detail level: architecture (clean, human-friendly), full (every symbol), high-level (subsystem C4 overview) (default: architecture)",
+    )
+    parser.add_argument(
+        "--high-level",
+        action="store_true",
+        help="generate high-level system overview diagram (subsystems, tiers & connections) as primary diagram",
     )
     parser.add_argument(
         "--max-diagram-nodes",
@@ -274,6 +280,16 @@ def main(argv: list[str] | None = None) -> int:
         "analysis": graph.meta.get("analysis", {}),
     }
 
+    if args.high_level:
+        args.diagram_detail = "high-level"
+
+    hla = build_high_level_architecture(root, graph)
+    highlevel_mermaid = render_mermaid_highlevel(
+        hla,
+        direction=args.diagram_direction if args.diagram_direction == "LR" else "TB",
+        theme=args.diagram_theme,
+    )
+
     mermaid_text: str | None = None
 
     try:
@@ -283,20 +299,31 @@ def main(argv: list[str] | None = None) -> int:
             written.append(path)
         if "md" in args.format:
             path = out / "ARCHITECTURE.md"
-            path.write_text(render_markdown(graph, meta), encoding="utf-8", newline="\n")
+            path.write_text(
+                render_markdown(graph, meta, high_level_mermaid=highlevel_mermaid),
+                encoding="utf-8",
+                newline="\n",
+            )
             written.append(path)
         if "mermaid" in args.format:
+            if args.diagram_detail in {"high-level", "overview"}:
+                mermaid_text = highlevel_mermaid
+            else:
+                mermaid_text = render_mermaid(
+                    graph,
+                    link_base=args.link_base,
+                    detail=args.diagram_detail,
+                    direction=args.diagram_direction,
+                    theme=args.diagram_theme,
+                    max_diagram_nodes=args.max_diagram_nodes,
+                )
             path = out / "diagram.mmd"
-            mermaid_text = render_mermaid(
-                graph,
-                link_base=args.link_base,
-                detail=args.diagram_detail,
-                direction=args.diagram_direction,
-                theme=args.diagram_theme,
-                max_diagram_nodes=args.max_diagram_nodes,
-            )
             path.write_text(mermaid_text, encoding="utf-8", newline="\n")
             written.append(path)
+
+            hl_path = out / "diagram-highlevel.mmd"
+            hl_path.write_text(highlevel_mermaid, encoding="utf-8", newline="\n")
+            written.append(hl_path)
         if "sarif" in args.format:
             path = out / "security.sarif"
             path.write_text(render_sarif(graph), encoding="utf-8", newline="\n")
@@ -315,14 +342,17 @@ def main(argv: list[str] | None = None) -> int:
 
         if image_formats:
             if mermaid_text is None:
-                mermaid_text = render_mermaid(
-                    graph,
-                    link_base=args.link_base,
-                    detail=args.diagram_detail,
-                    direction=args.diagram_direction,
-                    theme=args.diagram_theme,
-                    max_diagram_nodes=args.max_diagram_nodes,
-                )
+                if args.diagram_detail in {"high-level", "overview"}:
+                    mermaid_text = highlevel_mermaid
+                else:
+                    mermaid_text = render_mermaid(
+                        graph,
+                        link_base=args.link_base,
+                        detail=args.diagram_detail,
+                        direction=args.diagram_direction,
+                        theme=args.diagram_theme,
+                        max_diagram_nodes=args.max_diagram_nodes,
+                    )
             for fmt in image_formats:
                 img_path = out / f"diagram.{fmt}"
                 render_image(
@@ -334,6 +364,17 @@ def main(argv: list[str] | None = None) -> int:
                     offline=args.offline,
                 )
                 written.append(img_path)
+
+                hl_img_path = out / f"diagram-highlevel.{fmt}"
+                render_image(
+                    mermaid_source=highlevel_mermaid,
+                    output_path=hl_img_path,
+                    image_format=fmt,
+                    provider=args.image_provider,
+                    endpoint=args.image_endpoint,
+                    offline=args.offline,
+                )
+                written.append(hl_img_path)
 
         if args.ollama:
             args.llm = True
@@ -370,10 +411,18 @@ def main(argv: list[str] | None = None) -> int:
         for finding in graph.findings:
             counts[finding.severity] = counts.get(finding.severity, 0) + 1
         severity_text = ", ".join(f"{key}={counts[key]}" for key in ("critical", "high", "medium", "low", "info") if key in counts)
+        polyglot_bits = []
+        if hla.languages:
+            polyglot_bits.append(f"languages: {', '.join(sorted(hla.languages))}")
+        if hla.frameworks:
+            polyglot_bits.append(f"frameworks: {', '.join(sorted(hla.frameworks))}")
+        polyglot_info = f" [{'; '.join(polyglot_bits)}]" if polyglot_bits else ""
         print(
             f"gitdiagram: {result.python_files} Python files, {len(graph.nodes)} nodes, "
-            f"{len(graph.edges)} edges, {len(graph.features)} features, {len(graph.findings)} findings"
+            f"{len(graph.edges)} edges, {len(graph.features)} features, {len(hla.subsystems)} subsystems, "
+            f"{len(graph.findings)} findings"
             + (f" ({severity_text})" if severity_text else "")
+            + polyglot_info
         )
         if result.parse_errors:
             print(f"gitdiagram: skipped {len(result.parse_errors)} file(s) with parse errors", file=sys.stderr)

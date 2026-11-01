@@ -5,8 +5,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.so
-#
-test*
+# Temporary test screenshot or dumps
+test-*.jpeg
+test-*.png
+test_output/
+test_docker_out/
 
 # ==============================================================================
 # Distribution / packaging

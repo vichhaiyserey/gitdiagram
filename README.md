@@ -2,30 +2,30 @@
 
 # ⚡ gitdiagram
 
-### *Small but Gold* — Deterministic Architecture, Relationship, and Security Intelligence for Python Repositories.
+### *Small but Gold* — Deterministic Architecture, Polyglot System Diagrams, and Security Intelligence for Repositories.
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-Standard%20Library%20Only-success.svg?style=flat-square)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/Tests-89%2F89%20Passing-brightgreen.svg?style=flat-square)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-97%2F97%20Passing-brightgreen.svg?style=flat-square)](tests/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=flat-square&logo=docker&logoColor=white)](Dockerfile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Cross Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Ubuntu%20%7C%20RHEL%20%7C%20Windows-blueviolet.svg?style=flat-square)](#-100-cross-platform-matrix)
 
 <p align="center">
-  <b>Transform complex Python codebases into human-friendly architecture diagrams, high-res images, security threat models, and AI-powered architectural reviews.</b><br>
-  <i>100% offline-first. Zero external Python packages. Fully deterministic. Cites exact <code>path:line</code> for every finding.</i>
+  <b>Transform codebases into clear, human-friendly system architecture diagrams (gitdiagram.com style), publication-quality images, security threat models, and AI reviews.</b><br>
+  <i>100% offline-first. Zero external Python dependencies. Polyglot support across <b>.NET (C#)</b>, <b>Node.js / TypeScript</b>, <b>Python</b>, and <b>Docker / Kubernetes / Terraform</b>.</i>
 </p>
 
 ---
 
 [Key Highlights](#-key-highlights) •
-[Architecture Pipeline](#-how-it-works) •
+[High-Level Architecture Diagrams](#-high-level-system-architecture-diagrams-gitdiagramcom-style) •
+[Polyglot Ecosystem Support](#-polyglot-ecosystem-support) •
 [Quick Start](#-quick-start) •
 [Containerized Run](#-containerized-execution-docker--podman) •
 [Visual Diagrams & Images](#-visual-diagrams--image-generation) •
 [Security & IaC SAST](#-security--iac-static-analysis) •
 [AI Architectural Reviews](#-ai-architectural-reviews-ollama--qwen) •
-[Cross-Platform Matrix](#-100-cross-platform-matrix) •
 [CLI Reference](#-cli-reference)
 
 ---
@@ -35,54 +35,93 @@
 ## 🌟 Key Highlights
 
 - **Pure Python Standard Library (`zero dependencies`)**: Runs instantly without downloading hundreds of megabytes of third-party wheels. Zero supply chain attack surface.
-- **Human-Friendly Visual Architecture Diagrams**: Generates modern Mermaid diagrams organized into logical functional tiers with developer-friendly icons, clean layouts, and clickable source code links.
+- **High-Level System Overview Diagrams (`gitdiagram.com` style)**: Automatically produces high-level C4-style tier diagrams (`diagram-highlevel.mmd` & `diagram-highlevel.png`) explaining how Clients, API Gateways, Microservices, Databases, Caches, Message Brokers, and Runtime Platforms connect.
+- **Polyglot & Multi-Project Flexibility**: First-class detection and architectural relationship mapping for **.NET (C#/F#)** solutions (`*.csproj`, `<ProjectReference>`, ASP.NET Core, EF Core, MediatR), **Node.js / TypeScript** (`package.json`, Express, NestJS, Next.js, Prisma, TypeORM), and **Python** (FastAPI, Flask, Django, Celery, SQLAlchemy).
 - **Multi-Format Image Rendering**: Export directly to **PNG**, **SVG**, or **PDF**. Uses pre-bundled offline Mermaid CLI (`mmdc`) + headless Chromium or zero-dependency HTTP fallbacks (Kroki, mermaid.ink).
-- **Security & IaC SAST Overlay**: Discovers entrypoints (FastAPI, Flask, Django, Click), traces taint dataflows to dangerous sinks (command execution, SQL injection, unsafe deserialization), catches hardcoded secrets, and audits Dockerfile, Kubernetes, Terraform, and GitHub Actions configurations.
+- **Security & IaC SAST Overlay**: Discovers entrypoints, traces taint dataflows to dangerous sinks, catches hardcoded secrets, and audits Dockerfile, Kubernetes, Terraform, and GitHub Actions configurations with exact `path:line` citations.
 - **SARIF Code-Scanning Export**: Generates industry-standard `security.sarif` for seamless integration into GitHub Advanced Security, GitLab SAST, or DefectDojo.
 - **AI Architectural & Threat Modeling Reviews**: Integrates with local/containerized **Ollama (Qwen, LLaMA, DeepSeek)** or OpenAI endpoints. The LLM receives the deterministic graph and produces evidence-grounded reviews citing exact `path:line` with zero hallucinations.
-- **4 Specialized Review Profiles**: Executive Comprehensive Review, Formal STRIDE Threat Model, Developer Remediation Playbook, or OWASP/CIS Compliance Audit.
 - **Hardened Multi-Stage Container**: Runs securely as an unprivileged non-root user (`gitdiagram`, UID `10001`), compatible with Docker, Docker Compose, and rootless Podman on SELinux.
 - **100% Deterministic & CI-Ready**: Same codebase produces byte-for-byte identical graphs. Exit codes signal analysis success (`0`), errors (`1`), or security threshold violations (`2`).
 
 ---
 
-## 🏗️ How It Works
+## 🏛️ High-Level System Architecture Diagrams (`gitdiagram.com` Style)
+
+When explaining system design to engineers, architects, managers, or stakeholders, raw function call graphs create noise. `gitdiagram` automatically compiles a clean **C4 Container / Tier System Overview Diagram** into:
+- `diagram-highlevel.mmd` (Mermaid code)
+- `diagram-highlevel.png` / `.svg` (Rendered image)
+- Embedded at the top of `ARCHITECTURE.md`
+
+### Visual Architecture Tiering:
 
 ```mermaid
-flowchart LR
-    subgraph IN["📥 Inputs"]
-        PY["🐍 Python Source Code"]
-        IAC["🐳 Docker / K8s / TF / CI"]
-    end
+flowchart TB
+  subgraph Tier_Ingress["🌐 Clients & Ingress"]
+    direction LR
+    client_ingress(["<b>Clients / Frontends</b><br/><i>Web, Mobile & CLI</i>"]):::ingress
+  end
 
-    subgraph ENGINE["⚡ gitdiagram Deterministic Core"]
-        direction TB
-        AST["AST & Symbol Extractor"]
-        RES["Resolution & Type Inference Engine\n(Confidence Scoring: 0.5 - 1.0)"]
-        SEC["Security & Taint Overlay\n(CWE Mapping + IaC Scanner)"]
-        AST --> RES --> SEC
-    end
+  subgraph Tier_Gateway["🚪 Presentation & API Gateway"]
+    direction LR
+    web_api[["<b>Web API Subsystem</b><br/><i>ASP.NET Core • Express.js • FastAPI</i><br/><small>14 Endpoints • JWT Auth</small>"]]:::gateway
+  end
 
-    subgraph GRAPH["📊 Graph Intermediate Representation (IR)"]
-        GJSON["graph.json\n(Nodes, Edges, Findings, Features)"]
-    end
+  subgraph Tier_Services["⚙️ Domain & Core Services"]
+    direction LR
+    order_svc["<b>Order Service</b><br/><i>MediatR / CQRS • Domain Logic</i><br/><small>8 Handlers • 4 Events</small>"]:::services
+    billing_svc["<b>Billing Service</b><br/><i>Subscription & Invoicing</i><br/><small><b>⚠️ 1 HIGH</b></small>"]:::high
+  end
 
-    subgraph OUT["📤 Multi-Modal Deliverables"]
-        direction TB
-        MMD["🗺️ diagram.mmd\n(Human-Friendly Mermaid)"]
-        IMG["🖼️ diagram.png / .svg / .pdf\n(High-Res Architecture Image)"]
-        ARCH["📑 ARCHITECTURE.md\n(Cited Architectural Map)"]
-        SAR["🛡️ security.sarif\n(GitHub / GitLab Code Scanning)"]
-        AI["🤖 NARRATIVE.md\n(STRIDE Review via Ollama / Qwen)"]
-    end
+  subgraph Tier_Data["🗄️ Persistence & Data Stores"]
+    direction LR
+    db_store[("<b>PostgreSQL / SQL Server</b><br/><i>Entity Framework • Prisma • SQLAlchemy</i><br/><small>Port 5432</small>")]:::data
+    cache_store[("<b>Redis Cache</b><br/><i>StackExchange.Redis • ioredis</i><br/><small>Port 6379</small>")]:::data
+    queue_broker[["<b>RabbitMQ Broker</b><br/><i>MassTransit • Celery • AMQP</i><br/><small>Port 5672</small>"]]:::data
+  end
 
-    IN --> ENGINE --> GRAPH
-    GRAPH --> MMD
-    GRAPH --> IMG
-    GRAPH --> ARCH
-    GRAPH --> SAR
-    GRAPH --> AI
+  subgraph Tier_External["📦 External Services & Integrations"]
+    direction LR
+    stripe_ext[/"<b>Stripe Payments</b><br/><i>Stripe SDK (Charges & Webhooks)</i>"/]:::external
+    ai_ext[/"<b>AI LLM Provider</b><br/><i>OpenAI / Anthropic API</i>"/]:::external
+  end
+
+  subgraph Tier_Platform["☁️ Runtime Platform & Containers"]
+    direction LR
+    docker_platform["<b>Docker Platform</b><br/><i>Multi-Stage Containers • Compose</i>"]:::platform
+  end
+
+  classDef ingress fill:#f0fdf4,stroke:#16a34a,stroke-width:2px,color:#14532d;
+  classDef gateway fill:#eff6ff,stroke:#2563eb,stroke-width:2px,color:#1e40af;
+  classDef service fill:#faf5ff,stroke:#9333ea,stroke-width:2px,color:#581c87;
+  classDef data fill:#fffbeb,stroke:#d97706,stroke-width:2px,color:#78350f;
+  classDef external fill:#f8fafc,stroke:#475569,stroke-width:2px,color:#0f172a;
+  classDef platform fill:#f0f9ff,stroke:#0284c7,stroke-width:2px,color:#075985;
+  classDef high fill:#fff7ed,stroke:#ea580c,stroke-width:2px,color:#9a3412;
+
+  client_ingress ==|HTTPS / REST|==> web_api
+  web_api ==|Invokes / Dispatches|==> order_svc
+  web_api ==|Invokes|==> billing_svc
+  order_svc --|Queries / Persists|--> db_store
+  order_svc -.|Publishes Events|.-> queue_broker
+  order_svc -.|Caches State|.-> cache_store
+  billing_svc -.|Process Payments|.-> stripe_ext
+  billing_svc -.|Generate Summaries|.-> ai_ext
+  docker_platform -.|Runs & Hosts|.-> web_api
 ```
+
+---
+
+## 🔀 Polyglot Ecosystem Support
+
+`gitdiagram` automatically identifies project manifests and code patterns across multiple ecosystems:
+
+| Ecosystem | Manifests Inspected | Architectural Elements Detected |
+| :--- | :--- | :--- |
+| **.NET (C# / F#)** | `*.sln`, `*.csproj`, `*.fsproj` | • Direct project dependency arrows via `<ProjectReference>`<br>• ASP.NET Core Web API, Controllers (`[ApiController]`, `[HttpGet]`), Minimal APIs (`app.MapGet`)<br>• Entity Framework Core (SQL Server, PostgreSQL/Npgsql, SQLite, Cosmos DB) & DbContexts<br>• MediatR CQRS handlers (`IRequestHandler<T>`), MassTransit / RabbitMQ brokers<br>• StackExchange.Redis cache, Stripe.net, SendGrid, AWS/Azure SDKs |
+| **Node.js / TypeScript** | `package.json`, workspaces, `schema.prisma` | • Frameworks: Express.js, Fastify, NestJS, Next.js, Hono, Koa, React/Vue frontends<br>• ORMs: Prisma (auto-counts models & datasource provider), TypeORM, Mongoose (MongoDB), Sequelize<br>• Caching & Queues: Redis (`ioredis`, `redis`), BullMQ (`bullmq`), RabbitMQ (`amqplib`), Kafka<br>• Integrations: Stripe, OpenAI, Anthropic, AWS SDK, SendGrid |
+| **Python** | `pyproject.toml`, `requirements.txt`, `*.py` AST | • Frameworks: FastAPI, Flask, Django, Starlette, Tornado, Celery, Click, Typer<br>• ORMs & DBs: SQLAlchemy, Django ORM, Tortoise-ORM, asyncpg, psycopg2, pymongo<br>• Taint tracking: sources to dangerous execution/injection sinks (CWE-78, CWE-89, CWE-502) |
+| **Infrastructure & IaC** | `docker-compose.yml`, `Dockerfile`, K8s, Terraform | • Docker Compose service images, published ports, and `depends_on` relationships<br>• Dockerfile unpinned tags, non-root users, exposed ports<br>• Kubernetes manifests & Terraform cloud security rules |
 
 ---
 
@@ -93,21 +132,24 @@ flowchart LR
 Because `gitdiagram` requires **only the Python standard library**, you can run it immediately on any machine with Python 3.10+:
 
 ```bash
-# Analyze current repository:
+# Analyze any repository:
 python gitdiagram.py --dir="."
 
-# Analyze and generate an architecture image (.png):
+# Generate both detailed architecture diagram and high-level system diagram with PNG images:
 python gitdiagram.py --dir="." --image
 
-# Run a security scan with CI gate threshold:
-python gitdiagram.py --dir="." --fail-on high
+# Generate high-level system overview as primary diagram:
+python gitdiagram.py --dir="." --high-level --image
 ```
 
 Default outputs are written directly to `<repo>/.gitdiagram/`:
-- `graph.json` — Complete graph schema (nodes, edges, confidence, features, findings).
-- `ARCHITECTURE.md` — Cited architecture breakdown and entrypoint catalog.
-- `diagram.mmd` — Human-friendly visual Mermaid flowchart.
-- `diagram.png` — Rendered architecture diagram image (when `--image` is specified).
+- `diagram-highlevel.mmd` — High-level C4 system overview diagram (`gitdiagram.com` style).
+- `diagram-highlevel.png` — High-res rendered system architecture image (when `--image` is specified).
+- `diagram.mmd` — Detailed architecture flowchart.
+- `diagram.png` — Rendered detailed architecture image (when `--image` is specified).
+- `ARCHITECTURE.md` — Complete architecture report with the high-level diagram embedded at the top.
+- `graph.json` — Machine-readable graph schema (nodes, edges, confidence, features, findings).
+- `security.sarif` — SARIF code-scanning findings.
 
 ---
 
@@ -115,17 +157,13 @@ Default outputs are written directly to `<repo>/.gitdiagram/`:
 
 ```bash
 # Clone the repository:
-git clone https://github.com/your-org/gitdiagram.git
-cd gitdiagram
-
-# (Optional) Create a virtual environment:
-python3 -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\Activate.ps1
+git clone https://github.com/vichhaiyserey/gitgendiagram.git
+cd gitgendiagram
 
 # Install in editable mode:
 pip install -e .
 
-# Run anywhere:
+# Run on any project:
 gitdiagram --dir /path/to/project --image svg
 ```
 
@@ -177,28 +215,27 @@ docker compose run --rm gitdiagram --ollama qwen2.5-coder --llm-template compreh
 
 ## 🗺️ Visual Diagrams & Image Generation
 
-### Human-Friendly Architecture Views
+### Detail Level Modes (`--diagram-detail`):
 
-Traditional AST visualizers generate chaotic "spaghetti graphs" containing thousands of trivial helper symbols. `gitdiagram` defaults to `--diagram-detail architecture`, which groups your codebase into clean functional clusters:
-
-- **Tiered Subgraphs**: Entrypoints & Web APIs → Core Domain Services & Modules → Data Models & Infrastructure.
-- **Visual Emojis & Badges**: `🌐 GET /api/v1/users`, `⚙️ UserService`, `📦 UserModel`, `🛡️ CWE-89`.
-- **Modern Theme**: Professional color palette inspired by Tailwind CSS (`--diagram-theme modern` or `classic`).
-- **Directional Control**: Choose horizontal `--diagram-direction LR` (default) or vertical `TB`.
-- **Interactive Source Links**: Supply `--link-base https://github.com/org/repo/blob/main` to make diagram nodes clickable directly to GitHub/GitLab lines.
+1. **`high-level` (or `--high-level`)**:
+   Produces the clean, executive-ready C4 system diagram (`gitdiagram.com` style) showing Subsystems, Ingress, Gateways, Core Services, Databases, Caches, Brokers, and External APIs.
+2. **`architecture` (default for `diagram.mmd`)**:
+   Grounded functional architecture with classes, routes, models, and external dependencies. Class methods are collapsed into parent classes and intra-feature import noise is suppressed.
+3. **`full`**:
+   Exhaustive raw symbol graph including individual helper functions, private methods, and modules.
 
 ### Multi-Format Diagram Images
 
 Generate publication-ready architecture diagrams in **PNG**, **SVG**, or **PDF**:
 
 ```bash
-# Default PNG output (diagram.png):
+# Default PNG output (diagram.png and diagram-highlevel.png):
 gitdiagram --image
 
-# Crisp vector SVG output (diagram.svg):
+# Crisp vector SVG output:
 gitdiagram --image svg
 
-# High-resolution PDF document (diagram.pdf):
+# High-resolution PDF document:
 gitdiagram --image pdf
 
 # Export all diagram formats simultaneously:
@@ -215,7 +252,7 @@ gitdiagram --format json,md,mermaid,png,svg,pdf
 
 ## 🛡️ Security & IaC Static Analysis
 
-`gitdiagram` performs static security analysis across Python application code and infrastructure files:
+`gitdiagram` performs static security analysis across application code and infrastructure files:
 
 ### Application Security Rules (SAST)
 
@@ -234,28 +271,6 @@ gitdiagram --format json,md,mermaid,png,svg,pdf
 - **Kubernetes**: Missing `runAsNonRoot`, `privileged: true`, dangerous capabilities (`SYS_ADMIN`), missing resource limits.
 - **Terraform**: S3 buckets with public read/write ACLs, unrestricted security group ingress (`0.0.0.0/0`).
 - **GitHub Actions**: Workflows using `pull_request_target` with explicit checkouts, untrusted script execution.
-
-### CI/CD Quality Gate & SARIF Integration
-
-Fail your CI build if security findings exceed your threshold:
-
-```bash
-# Exit code 2 if any critical or high vulnerability is found:
-gitdiagram --fail-on high --format json,md,sarif
-```
-
-Upload `security.sarif` directly to GitHub Code Scanning:
-
-```yaml
-- name: Run gitdiagram Security Scan
-  run: python gitdiagram.py --dir . --fail-on high --format sarif
-
-- name: Upload SARIF to GitHub Security Dashboard
-  uses: github/codeql-action/upload-sarif@v3
-  if: always()
-  with:
-    sarif_file: .gitdiagram/security.sarif
-```
 
 ---
 
@@ -320,7 +335,9 @@ usage: gitdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
                   [--image [FORMAT]] [--image-format {png,svg,pdf}]
                   [--image-provider {auto,local,kroki,mermaid.ink}]
                   [--image-endpoint IMAGE_ENDPOINT] [--offline]
-                  [--diagram-detail {architecture,full}]
+                  [--diagram-detail {architecture,full,high-level,overview}]
+                  [--high-level]
+                  [--max-diagram-nodes MAX_DIAGRAM_NODES]
                   [--diagram-direction {LR,TB}]
                   [--diagram-theme {modern,classic}]
                   [--ollama [MODEL]] [--llm] [--llm-model LLM_MODEL]
@@ -338,10 +355,11 @@ usage: gitdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 | `--dir DIR` | `.` | Target repository directory to inspect |
 | `--out OUT` | `<dir>/.gitdiagram` | Output directory for all generated artifacts |
 | `--format FORMAT` | `json,md,mermaid` | Comma-separated outputs: `json`, `md`, `mermaid`, `sarif`, `png`, `svg`, `pdf` |
-| `--image [FORMAT]` | `png` | Render visual diagram to image (`png`, `svg`, `pdf`) |
+| `--high-level` | `false` | Generate high-level system overview diagram (`gitdiagram.com` style) as primary diagram |
+| `--diagram-detail` | `architecture` | Visual detail level: `architecture`, `full`, `high-level`, `overview` |
+| `--image [FORMAT]` | `png` | Render visual diagrams to image (`png`, `svg`, `pdf`) |
 | `--image-provider` | `auto` | Image renderer: `auto`, `local` (`mmdc`), `kroki`, `mermaid.ink` |
 | `--offline` | `false` | Enforce strictly offline execution; forbids external HTTP calls |
-| `--diagram-detail` | `architecture` | Visual detail level: `architecture` (clean tiers) or `full` (every symbol) |
 | `--max-diagram-nodes` | `150` | Max components displayed in architecture diagram; 0 for unlimited |
 | `--diagram-direction`| `LR` | Diagram orientation: `LR` (horizontal) or `TB` (top-to-bottom) |
 | `--diagram-theme` | `modern` | Visual theme palette: `modern` (Tailwind) or `classic` |
@@ -355,28 +373,19 @@ usage: gitdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 | `--quiet` | `false` | Suppress console summary output |
 | `--version` | — | Display program version (`gitdiagram 0.1.0`) |
 
-### Exit Codes
-
-- `0`: Success (all outputs generated, no security thresholds violated).
-- `1`: Error (invalid arguments, AST analysis failure, or unrecoverable error).
-- `2`: Security Threshold Breached (vulnerabilities found at or above `--fail-on` severity).
-
 ---
 
 ## 🧪 Comprehensive Test Suite
 
-`gitdiagram` includes a test suite covering AST discovery, call resolution, security heuristics, image renderers, and deterministic CLI behaviors:
+`gitdiagram` includes 97 unit tests covering AST discovery, call resolution, polyglot .NET and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, and deterministic CLI behaviors:
 
 ```bash
 # Run all unit tests:
-python -m unittest discover -s tests -v
-
-# Or simply:
 python -m unittest
 ```
 
 ```text
-Ran 89 tests in 0.958s
+Ran 97 tests in 6.933s
 OK
 ```
 

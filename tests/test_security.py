@@ -108,6 +108,7 @@ class SecurityTests(unittest.TestCase):
 
     def test_env_example_and_placeholders_ignored(self) -> None:
         import tempfile
+
         from gitdiagram_core.analyzer import AnalysisConfig, run_analysis
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
@@ -120,6 +121,7 @@ class SecurityTests(unittest.TestCase):
 
     def test_tls_verification_disabled(self) -> None:
         import tempfile
+
         from gitdiagram_core.analyzer import AnalysisConfig, run_analysis
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
@@ -135,6 +137,7 @@ class SecurityTests(unittest.TestCase):
 
     def test_secret_token_patterns(self) -> None:
         import tempfile
+
         from gitdiagram_core.analyzer import AnalysisConfig, run_analysis
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)

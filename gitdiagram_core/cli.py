@@ -12,11 +12,11 @@ from .analyzer import AnalysisConfig, run_analysis
 from .high_level import build_high_level_architecture, render_mermaid_highlevel
 from .llm import NarrativeError, generate_narrative
 from .model import SEVERITY_RANK
+from .render_image import ImageRenderError, render_image
 from .render_json import render_json
 from .render_markdown import render_markdown
 from .render_mermaid import render_mermaid
 from .render_sarif import render_sarif
-from .render_image import ImageRenderError, render_image
 
 FORMATS = {"json", "md", "mermaid", "sarif", "png", "svg", "pdf", "image"}
 

@@ -84,7 +84,6 @@ def render_markdown(
     meta = dict(meta or {})
     nodes = graph.sorted_nodes()
     node_by_id = {node.id: node for node in nodes}
-    docs_by_id = {node.id: node for node in nodes}
 
     lines: list[str] = []
     name = meta.get("name") or "repository"

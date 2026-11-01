@@ -1,10 +1,6 @@
 from __future__ import annotations
 
 import io
-import json
-import os
-import shutil
-import subprocess
 import sys
 import tempfile
 import unittest
@@ -18,12 +14,14 @@ if str(ROOT) not in sys.path:
 
 from gitdiagram_core.render_image import (
     ImageRenderError,
-    main as image_cli_main,
     render_image,
     render_kroki,
     render_local_mmdc,
     render_mermaid_ink,
     sanitize_mermaid,
+)
+from gitdiagram_core.render_image import (
+    main as image_cli_main,
 )
 
 

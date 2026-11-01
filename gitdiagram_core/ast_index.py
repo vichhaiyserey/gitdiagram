@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 MAX_TEXT = 240
 
@@ -168,9 +169,9 @@ class _Indexer(ast.NodeVisitor):
         for arg in node.args.posonlyargs + node.args.args + node.args.kwonlyargs:
             if arg.annotation is not None:
                 arg_types[arg.arg] = _text(arg.annotation)
-        for arg in (node.args.vararg, node.args.kwarg):
-            if arg is not None and arg.annotation is not None:
-                arg_types[arg.arg] = _text(arg.annotation)
+        for maybe_arg in (node.args.vararg, node.args.kwarg):
+            if maybe_arg is not None and maybe_arg.annotation is not None:
+                arg_types[maybe_arg.arg] = _text(maybe_arg.annotation)
         record = DefRec(
             kind=actual_kind,
             name=node.name,

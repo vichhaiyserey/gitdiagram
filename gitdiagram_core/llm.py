@@ -255,6 +255,8 @@ def generate_narrative(
         else:
             max_tokens = 1500 if is_ollama else None
 
+    final_key: str | None
+
     if is_ollama:
         final_base = target_base or "http://localhost:11434/v1"
         final_model = (
@@ -326,7 +328,7 @@ def generate_narrative(
                 f"(or docker exec -it <container> ollama pull {final_model})"
             ) from exc
         raise NarrativeError(f"LLM request failed (HTTP {exc.code}): {err_body}") from exc
-    except (urllib.error.URLError, TimeoutError, socket.timeout) as exc:
+    except (urllib.error.URLError, TimeoutError) as exc:
         is_timeout = (
             isinstance(exc, (TimeoutError, socket.timeout))
             or "timed out" in str(exc).lower()

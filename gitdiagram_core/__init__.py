@@ -3,8 +3,14 @@
 __version__ = "0.1.0"
 SCHEMA_VERSION = 1
 
+from .high_level import (
+    HighLevelArchitecture,
+    Subsystem,
+    SubsystemConnection,
+    build_high_level_architecture,
+    render_mermaid_highlevel,
+)
 from .render_image import ImageRenderError, render_image
-from .high_level import HighLevelArchitecture, Subsystem, SubsystemConnection, build_high_level_architecture, render_mermaid_highlevel
 
 __all__ = [
     "__version__",

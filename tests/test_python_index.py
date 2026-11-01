@@ -108,6 +108,7 @@ class AstAndResolverTests(unittest.TestCase):
 
     def test_augmented_assignment_indexing(self) -> None:
         import tempfile
+
         from gitdiagram_core.ast_index import index_file
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
@@ -120,6 +121,7 @@ class AstAndResolverTests(unittest.TestCase):
 
     def test_star_import_resolution(self) -> None:
         import tempfile
+
         from gitdiagram_core.ast_index import index_repo
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
@@ -136,6 +138,7 @@ class AstAndResolverTests(unittest.TestCase):
 
     def test_package_reexport_resolution(self) -> None:
         import tempfile
+
         from gitdiagram_core.ast_index import index_repo
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)

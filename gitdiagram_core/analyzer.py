@@ -11,7 +11,7 @@ from .features import assign_features
 from .frameworks import annotate
 from .graph_builder import BuildStats, GraphBuilder
 from .iac import analyze_iac
-from .model import Graph
+from .model import Finding, Graph
 from .resolver import Resolver
 from .security import analyze as analyze_security
 
@@ -44,11 +44,11 @@ def run_analysis(config: AnalysisConfig) -> AnalysisResult:
     builder = GraphBuilder(indexes, resolver, max_nodes=config.max_nodes)
     graph = builder.build()
 
-    findings = []
+    findings: list[Finding] = []
     if config.security:
         findings.extend(analyze_iac(graph, repo))
         findings.extend(analyze_security(graph, indexes, resolver, repo.root, repo.rel_files))
-    merged: dict[str, object] = {}
+    merged: dict[str, Finding] = {}
     for finding in findings:
         merged.setdefault(finding.id, finding)
     graph.findings = list(merged.values())

@@ -54,7 +54,6 @@ def _dockerfile(root: Path, path: str) -> IacResult:
     base_images: list[str] = []
     user: str | None = None
     exposed: list[str] = []
-    line_no = 1
     node = _node(path, path.rsplit("/", 1)[-1], "infra", 1, {"type": "container_image"})
     for number, raw in enumerate(lines, start=1):
         line = raw.strip()
@@ -121,7 +120,6 @@ def _dockerfile(root: Path, path: str) -> IacResult:
                         "Inject secrets at runtime from a secret manager.",
                     )
                 )
-        line_no = number
     if user is None or user.lower() in {"root", "0"}:
         result.findings.append(
             IacFinding(
@@ -147,7 +145,6 @@ def _compose(root: Path, path: str) -> IacResult:
     except OSError:
         return result
     service: str | None = None
-    service_line = 1
     service_attrs: dict[str, dict] = {}
     service_nodes: dict[str, Node] = {}
     in_services = False
@@ -164,7 +161,6 @@ def _compose(root: Path, path: str) -> IacResult:
             continue
         if indent == 2 and stripped.endswith(":"):
             service = stripped[:-1]
-            service_line = number
             service_attrs[service] = {}
             service_nodes[service] = _node(path, service, "service", number, {"type": "compose_service"})
             result.nodes.append(service_nodes[service])

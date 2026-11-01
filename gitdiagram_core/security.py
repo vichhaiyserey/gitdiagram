@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from .ast_index import CallRec, DefRec, FileIndex
 from .model import Finding, Graph, Loc, stable_id

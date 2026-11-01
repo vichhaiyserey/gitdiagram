@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .model import Graph, Node, SEVERITY_RANK
+from .model import SEVERITY_RANK, Graph, Node
 
 MODERN_HIGHLEVEL_INIT = """%%{init: {
   'theme': 'base',

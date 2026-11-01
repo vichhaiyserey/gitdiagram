@@ -1,14 +1,11 @@
 from __future__ import annotations
 
-import io
 import contextlib
-import json
-import os
+import io
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -17,9 +14,6 @@ if str(ROOT) not in sys.path:
 from gitdiagram_core.analyzer import AnalysisConfig, run_analysis
 from gitdiagram_core.cli import main
 from gitdiagram_core.high_level import (
-    HighLevelArchitecture,
-    Subsystem,
-    SubsystemConnection,
     build_high_level_architecture,
     render_mermaid_highlevel,
 )

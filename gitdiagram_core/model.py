@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import Any
 
 from . import SCHEMA_VERSION, __version__
 
@@ -13,7 +14,7 @@ SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
 
 def stable_id(*parts: str) -> str:
     """Return a deterministic, collision-resistant identifier."""
-    digest = hashlib.sha1("\x1f".join(parts).encode("utf-8")).hexdigest()
+    digest = hashlib.sha1("\x1f".join(parts).encode("utf-8"), usedforsecurity=False).hexdigest()
     return digest[:12]
 
 

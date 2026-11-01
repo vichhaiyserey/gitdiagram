@@ -30,6 +30,41 @@ classifiers = [
 gitdiagram = "gitdiagram_core.cli:main"
 gitdiagram-image = "gitdiagram_core.render_image:main"
 
+[project.optional-dependencies]
+dev = [
+    "bandit[toml]>=1.7.9",
+    "coverage[toml]>=7.6",
+    "mypy>=1.11",
+    "pip-audit>=2.7",
+    "ruff>=0.6",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["gitdiagram_core*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = [".venv", "tests/fixtures"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"gitdiagram_core/__init__.py" = ["E402"]
+"tests/**" = ["E402"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["gitdiagram_core"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+
+[tool.coverage.run]
+source = ["gitdiagram_core"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+fail_under = 80

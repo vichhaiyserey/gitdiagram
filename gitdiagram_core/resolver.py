@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import builtins
 import re
-import sys
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
 
 from .ast_index import CallRec, DefRec, FileIndex, ImportRec
 

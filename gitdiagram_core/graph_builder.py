@@ -8,7 +8,7 @@ import sys
 from dataclasses import dataclass, field
 
 from .ast_index import FileIndex
-from .model import Edge, Graph, Loc, Node, stable_id
+from .model import Graph, Loc, Node, stable_id
 from .resolver import Resolution, Resolver
 
 BASE_SPLIT_RE = re.compile(r"[\[\(]")

@@ -11,7 +11,7 @@ LEVEL = {"critical": "error", "high": "error", "medium": "warning", "low": "note
 
 
 def render_sarif(graph: Graph) -> str:
-    rules = []
+    rules: list[dict[str, object]] = []
     rule_index: dict[str, int] = {}
     for finding in graph.sorted_findings():
         key = f"{finding.category}:{finding.cwe or ''}"

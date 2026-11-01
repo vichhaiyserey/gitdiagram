@@ -7,7 +7,6 @@ import base64
 import json
 import os
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
@@ -145,7 +144,7 @@ def render_kroki(
         raise ImageRenderError(f"Kroki rendering HTTP error {exc.code}: {err_body}") from exc
     except urllib.error.URLError as exc:
         raise ImageRenderError(f"Kroki connection failed: {exc.reason}") from exc
-    except (TimeoutError, socket.timeout) as exc:
+    except TimeoutError as exc:
         raise ImageRenderError(f"Kroki request timed out after {timeout}s") from exc
     except Exception as exc:
         raise ImageRenderError(f"Failed to fetch image from Kroki: {exc}") from exc
@@ -197,7 +196,7 @@ def render_mermaid_ink(
         raise ImageRenderError(f"mermaid.ink HTTP error {exc.code}: {err_body}") from exc
     except urllib.error.URLError as exc:
         raise ImageRenderError(f"mermaid.ink connection failed: {exc.reason}") from exc
-    except (TimeoutError, socket.timeout) as exc:
+    except TimeoutError as exc:
         raise ImageRenderError(f"mermaid.ink request timed out after {timeout}s") from exc
     except Exception as exc:
         raise ImageRenderError(f"Failed to fetch image from mermaid.ink: {exc}") from exc

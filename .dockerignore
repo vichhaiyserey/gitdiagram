@@ -1,4 +1,5 @@
 .git/
+.github/
 .venv/
 venv/
 env/
@@ -14,6 +15,16 @@ build/
 .ruff_cache/
 .idea/
 .vscode/
+tests/
+docker-compose*.yml
+.env
+.env.*
+.coverage
+.coverage.*
+coverage.xml
+bandit.json
+*.sarif
 *.png
 *.svg
 *.pdf
+*.jpeg

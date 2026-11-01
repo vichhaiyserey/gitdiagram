@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from .model import Graph, Node, SEVERITY_RANK
+from .model import SEVERITY_RANK, Graph, Node
 
 SHAPES = {
     "module": '["{label}"]',

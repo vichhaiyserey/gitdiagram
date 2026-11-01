@@ -158,30 +158,60 @@ def render_mermaid(
     detail: str = "architecture",
     direction: str = "LR",
     theme: str = "modern",
+    max_diagram_nodes: int = 150,
 ) -> str:
     """Compile graph into clear, structured, human-friendly Mermaid diagram."""
     graph.dedupe_edges()
     all_nodes = graph.sorted_nodes()
     severity = _severity_for(graph)
 
-    # In architecture detail mode, collapse private dunder methods like __init__ to their parent class
-    remap_dunders: dict[str, str] = {}
+    # In architecture detail mode:
+    # 1. Collapse class methods to their parent class
+    # 2. Omit private helper functions and redundant container modules
+    # 3. Cap nodes and edges to ensure diagrams are human-readable and within Mermaid limits
+    remap: dict[str, str] = {}
     if detail == "architecture":
         classes_by_name = {n.name: n.id for n in all_nodes if n.kind == "class"}
         classes_by_qual = {n.qualname: n.id for n in all_nodes if n.kind == "class"}
 
-        filtered_nodes: list[Node] = []
         for n in all_nodes:
-            if n.kind == "method" and n.name.startswith("__") and n.name.endswith("__"):
+            if n.kind == "method":
                 parts = n.qualname.split(".")
                 parent_id = None
                 if len(parts) >= 2:
                     parent_id = classes_by_name.get(parts[-2]) or classes_by_qual.get(".".join(parts[:-1]))
                 if parent_id:
-                    remap_dunders[n.id] = parent_id
-            else:
-                filtered_nodes.append(n)
-        nodes = filtered_nodes
+                    remap[n.id] = parent_id
+
+        candidates: list[Node] = []
+        for n in all_nodes:
+            if n.kind == "method":
+                continue
+            # Skip private functions without security findings
+            if n.kind == "function" and n.name.startswith("_") and n.id not in severity:
+                continue
+            # Skip container modules without security findings
+            if n.kind in {"module", "package"} and n.id not in severity:
+                continue
+            candidates.append(n)
+
+        # Prioritize top architectural nodes if repository exceeds max_diagram_nodes
+        if max_diagram_nodes and len(candidates) > max_diagram_nodes:
+            def _arch_rank(node: Node) -> tuple[int, int]:
+                if node.id in severity:
+                    return (0, -SEVERITY_RANK.get(severity[node.id], 0))
+                if node.kind in {"endpoint", "cli", "task"}:
+                    return (1, 0)
+                if node.kind in {"external", "infra", "workflow"}:
+                    return (2, 0)
+                if node.kind in {"service", "class"}:
+                    return (3, 0)
+                return (4, 0)
+
+            candidates.sort(key=lambda n: (_arch_rank(n), n.qualname))
+            nodes = candidates[:max_diagram_nodes]
+        else:
+            nodes = candidates
     else:
         nodes = all_nodes
 
@@ -270,17 +300,29 @@ def render_mermaid(
     lines.append(defs.rstrip())
 
     seen_edges: set[tuple[str, str, str]] = set()
+    node_by_id = {n.id: n for n in nodes}
+    edge_lines: list[str] = []
+
     for edge in graph.sorted_edges():
         if edge.kind == "contains":
             continue
 
-        src = remap_dunders.get(edge.src, edge.src)
-        dst = remap_dunders.get(edge.dst, edge.dst)
+        src = remap.get(edge.src, edge.src)
+        dst = remap.get(edge.dst, edge.dst)
 
         if src == dst:
             continue
         if src not in displayed_ids or dst not in displayed_ids:
             continue
+
+        src_node = node_by_id.get(src)
+        dst_node = node_by_id.get(dst)
+
+        # In architecture mode, suppress intra-feature imports to prevent visual noise
+        if detail == "architecture" and edge.kind == "imports":
+            if dst_node and dst_node.kind != "external":
+                if src_node and dst_node and (src_node.feature == dst_node.feature):
+                    continue
 
         edge_key = (src, dst, edge.kind)
         if edge_key in seen_edges:
@@ -295,7 +337,13 @@ def render_mermaid(
             arrow = "==>|new|"
         else:
             arrow = "-->"
-        lines.append(f"  n_{src} {arrow} n_{dst}")
+        edge_lines.append(f"  n_{src} {arrow} n_{dst}")
+
+    # In architecture mode, cap rendered edges to prevent exceeding Mermaid layout limits (500 maxEdges)
+    if detail == "architecture" and len(edge_lines) > 350:
+        edge_lines = edge_lines[:350]
+
+    lines.extend(edge_lines)
 
     if link_base:
         base = link_base.rstrip("/")

@@ -85,6 +85,20 @@ class ImageRenderTests(unittest.TestCase):
                         render_local_mmdc("flowchart LR\n A --> B", out_file)
                     self.assertIn("Syntax error in diagram", str(ctx.exception))
 
+    def test_local_mmdc_detects_rendered_error_box(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out_file = Path(tmp) / "diagram.svg"
+
+            def fake_run(cmd, **kwargs):
+                out_file.write_text("<svg><p>Maximum text size in diagram exceeded</p></svg>", encoding="utf-8")
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            with mock.patch("shutil.which", return_value="/usr/local/bin/mmdc"):
+                with mock.patch("subprocess.run", side_effect=fake_run):
+                    with self.assertRaises(ImageRenderError) as ctx:
+                        render_local_mmdc("A" * 60000, out_file, image_format="svg")
+                    self.assertIn("exceeded renderer limit", str(ctx.exception))
+
     def test_kroki_render_mocked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             out_file = Path(tmp) / "diagram.png"

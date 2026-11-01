@@ -75,6 +75,14 @@ class RenderTests(unittest.TestCase):
         classic_text = render_mermaid(self.graph, theme="classic")
         self.assertNotIn("themeVariables", classic_text)
 
+    def test_mermaid_max_diagram_nodes_capping(self) -> None:
+        # Test capping nodes in architecture mode
+        capped_text = render_mermaid(self.graph, detail="architecture", max_diagram_nodes=5)
+        self.assertIn("flowchart LR", capped_text)
+        # Should contain at most 5 node definitions plus subgraph lines
+        node_lines = [line for line in capped_text.splitlines() if line.strip().startswith("n_") and "-->" not in line and "-.->" not in line and "==>" not in line]
+        self.assertLessEqual(len(node_lines), 5)
+
     def test_markdown_is_cited_and_ascii(self) -> None:
         text = render_markdown(self.graph, self.meta)
         self.assertIn("# Architecture: sample_app", text)

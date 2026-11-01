@@ -179,6 +179,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="diagram detail level: architecture (clean, human-friendly), full (every symbol) (default: architecture)",
     )
     parser.add_argument(
+        "--max-diagram-nodes",
+        type=int,
+        default=150,
+        help="maximum components displayed in Mermaid architecture diagrams; 0 for unlimited (default: 150)",
+    )
+    parser.add_argument(
         "--diagram-direction",
         choices=["LR", "TB"],
         default="LR",
@@ -287,6 +293,7 @@ def main(argv: list[str] | None = None) -> int:
                 detail=args.diagram_detail,
                 direction=args.diagram_direction,
                 theme=args.diagram_theme,
+                max_diagram_nodes=args.max_diagram_nodes,
             )
             path.write_text(mermaid_text, encoding="utf-8", newline="\n")
             written.append(path)
@@ -314,6 +321,7 @@ def main(argv: list[str] | None = None) -> int:
                     detail=args.diagram_detail,
                     direction=args.diagram_direction,
                     theme=args.diagram_theme,
+                    max_diagram_nodes=args.max_diagram_nodes,
                 )
             for fmt in image_formats:
                 img_path = out / f"diagram.{fmt}"

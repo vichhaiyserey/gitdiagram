@@ -34,9 +34,11 @@ RUN chmod +x /usr/local/lib/node_modules/@mermaid-js/mermaid-cli/src/cli.js \
 ENV PUPPETEER_SKIP_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Create Puppeteer config file for mmdc
-RUN echo '{"args": ["--no-sandbox", "--disable-setuid-sandbox"]}' > /etc/puppeteer-config.json
-ENV MERMAID_CONFIG=/etc/puppeteer-config.json
+# Create Puppeteer and Mermaid config files for mmdc
+RUN echo '{"args": ["--no-sandbox", "--disable-setuid-sandbox"]}' > /etc/puppeteer-config.json \
+    && echo '{"maxTextSize": 5000000, "maxEdges": 2000}' > /etc/mermaid-config.json
+ENV PUPPETEER_CONFIG=/etc/puppeteer-config.json \
+    MERMAID_CONFIG=/etc/mermaid-config.json
 
 # Create non-root user for container security
 RUN useradd -u 10001 -m -s /bin/bash gitdiagram \

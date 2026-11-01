@@ -51,24 +51,61 @@ def render_local_mmdc(
         tmp.write(source)
         tmp_path = Path(tmp.name)
 
+    # Configure mmdc with high maxTextSize and maxEdges limits to prevent premature truncation
+    mermaid_cfg = {
+        "maxTextSize": 5000000,
+        "maxEdges": 2000,
+    }
+    with tempfile.NamedTemporaryFile("w", suffix=".json", encoding="utf-8", delete=False) as cfg_tmp:
+        json.dump(mermaid_cfg, cfg_tmp)
+        cfg_path = Path(cfg_tmp.name)
+
     pup_config = os.environ.get("PUPPETEER_CONFIG") or ("/etc/puppeteer-config.json" if os.path.exists("/etc/puppeteer-config.json") else None)
+    user_mermaid_cfg = os.environ.get("MERMAID_CONFIG")
+    chosen_cfg = user_mermaid_cfg if (user_mermaid_cfg and os.path.exists(user_mermaid_cfg)) else str(cfg_path)
+
     try:
-        cmd = [mmdc, "-i", str(tmp_path), "-o", str(output_path)]
+        cmd = [mmdc, "-i", str(tmp_path), "-o", str(output_path), "-c", chosen_cfg]
         if pup_config and os.path.exists(pup_config):
             cmd.extend(["-p", pup_config])
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
         if res.returncode != 0:
             err = res.stderr.strip() or res.stdout.strip()
+            if "Maximum text size in diagram exceeded" in err or "Edge limit exceeded" in err:
+                raise ImageRenderError(
+                    f"Mermaid complexity limit exceeded ({err}). "
+                    "Use '--diagram-detail architecture' or '--max-diagram-nodes 100' to generate a clean, focused architecture diagram."
+                )
             raise ImageRenderError(f"mmdc failed (exit {res.returncode}): {err}")
     finally:
-        if tmp_path.exists():
-            try:
-                tmp_path.unlink()
-            except OSError:
-                pass
+        for p in (tmp_path, cfg_path):
+            if p.exists():
+                try:
+                    p.unlink()
+                except OSError:
+                    pass
 
     if not output_path.exists() or output_path.stat().st_size == 0:
         raise ImageRenderError(f"mmdc finished without generating {output_path}")
+
+    # Detect Mermaid's internal rendered error box in output files
+    if image_format.lower() == "svg":
+        try:
+            svg_text = output_path.read_text(encoding="utf-8", errors="replace")
+            if "Maximum text size in diagram exceeded" in svg_text or "Edge limit exceeded" in svg_text:
+                raise ImageRenderError(
+                    f"Mermaid diagram text exceeded renderer limit ({len(source)} chars). "
+                    "Use '--diagram-detail architecture' or '--max-diagram-nodes 100' to generate a clean, focused architecture view."
+                )
+        except OSError:
+            pass
+    elif image_format.lower() == "png":
+        # Mermaid's error box is a fixed 168x76 box (~2.6KB)
+        if output_path.stat().st_size < 3500 and len(source) > 20000:
+            raise ImageRenderError(
+                f"Mermaid diagram exceeded complexity limits ({len(source)} chars). "
+                "Use '--diagram-detail architecture' or '--max-diagram-nodes 100' to generate a clean, focused architecture view."
+            )
 
 
 def render_kroki(

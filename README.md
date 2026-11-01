@@ -342,6 +342,7 @@ usage: gitdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 | `--image-provider` | `auto` | Image renderer: `auto`, `local` (`mmdc`), `kroki`, `mermaid.ink` |
 | `--offline` | `false` | Enforce strictly offline execution; forbids external HTTP calls |
 | `--diagram-detail` | `architecture` | Visual detail level: `architecture` (clean tiers) or `full` (every symbol) |
+| `--max-diagram-nodes` | `150` | Max components displayed in architecture diagram; 0 for unlimited |
 | `--diagram-direction`| `LR` | Diagram orientation: `LR` (horizontal) or `TB` (top-to-bottom) |
 | `--diagram-theme` | `modern` | Visual theme palette: `modern` (Tailwind) or `classic` |
 | `--link-base URL` | `None` | Prefix for clickable source links (e.g. `https://github.com/org/repo/blob/main`) |

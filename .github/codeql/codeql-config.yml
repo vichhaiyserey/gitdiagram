@@ -2,7 +2,7 @@ name: "CodeQL Configuration"
 
 # Restrict CodeQL analysis to production core and exclude test fixtures
 paths:
-  - gitdiagram_core
+  - secdiagram_core
 
 paths-ignore:
   - tests/**

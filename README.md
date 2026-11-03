@@ -1,6 +1,6 @@
 <div align="center">
 
-# ⚡ gitdiagram
+# ⚡ secdiagram
 
 ### *Small but Gold* — Deterministic Architecture, Polyglot System Diagrams, and Security Intelligence for Repositories.
 
@@ -12,14 +12,14 @@
 [![Cross Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Ubuntu%20%7C%20RHEL%20%7C%20Windows-blueviolet.svg?style=flat-square)](#-100-cross-platform-matrix)
 
 <p align="center">
-  <b>Transform codebases into clear, human-friendly system architecture diagrams (gitdiagram.com style), publication-quality images, security threat models, and AI reviews.</b><br>
+  <b>Transform codebases into clear, human-friendly system architecture diagrams, publication-quality images, security threat models, and AI reviews.</b><br>
   <i>100% offline-first. Zero external Python dependencies. Polyglot support across <b>.NET (C#)</b>, <b>Node.js / TypeScript</b>, <b>Python</b>, and <b>Docker / Kubernetes / Terraform</b>.</i>
 </p>
 
 ---
 
 [Key Highlights](#-key-highlights) •
-[High-Level Architecture Diagrams](#-high-level-system-architecture-diagrams-gitdiagramcom-style) •
+[High-Level Architecture Diagrams](#-high-level-system-architecture-diagrams-secdiagramcom-style) •
 [Polyglot Ecosystem Support](#-polyglot-ecosystem-support) •
 [Quick Start](#-quick-start) •
 [Containerized Run](#-containerized-execution-docker--podman) •
@@ -36,20 +36,20 @@
 ## 🌟 Key Highlights
 
 - **Pure Python Standard Library (`zero dependencies`)**: Runs instantly without downloading hundreds of megabytes of third-party wheels. Zero supply chain attack surface.
-- **High-Level System Overview Diagrams (`gitdiagram.com` style)**: Automatically produces high-level C4-style tier diagrams (`diagram-highlevel.mmd` & `diagram-highlevel.png`) explaining how Clients, API Gateways, Microservices, Databases, Caches, Message Brokers, and Runtime Platforms connect.
+- **High-Level System Overview Diagrams**: Automatically produces high-level C4-style tier diagrams (`diagram-highlevel.mmd` & `diagram-highlevel.png`) explaining how Clients, API Gateways, Microservices, Databases, Caches, Message Brokers, and Runtime Platforms connect.
 - **Polyglot & Multi-Project Flexibility**: First-class detection and architectural relationship mapping for **.NET (C#/F#)** solutions (`*.csproj`, `<ProjectReference>`, ASP.NET Core, EF Core, MediatR), **Node.js / TypeScript** (`package.json`, Express, NestJS, Next.js, Prisma, TypeORM), and **Python** (FastAPI, Flask, Django, Celery, SQLAlchemy).
 - **Multi-Format Image Rendering**: Export directly to **PNG**, **SVG**, or **PDF**. Uses pre-bundled offline Mermaid CLI (`mmdc`) + headless Chromium or zero-dependency HTTP fallbacks (Kroki, mermaid.ink).
 - **Security & IaC SAST Overlay**: Discovers entrypoints, traces taint dataflows to dangerous sinks, catches hardcoded secrets, and audits Dockerfile, Kubernetes, Terraform, and GitHub Actions configurations with exact `path:line` citations.
 - **SARIF Code-Scanning Export**: Generates industry-standard `security.sarif` for seamless integration into GitHub Advanced Security, GitLab SAST, or DefectDojo.
 - **AI Architectural & Threat Modeling Reviews**: Integrates with local/containerized **Ollama (Qwen, LLaMA, DeepSeek)** or OpenAI endpoints. The LLM receives the deterministic graph and produces evidence-grounded reviews citing exact `path:line` with zero hallucinations.
-- **Hardened Multi-Stage Container**: Runs securely as an unprivileged non-root user (`gitdiagram`, UID `10001`), compatible with Docker, Docker Compose, and rootless Podman on SELinux.
+- **Hardened Multi-Stage Container**: Runs securely as an unprivileged non-root user (`secdiagram`, UID `10001`), compatible with Docker, Docker Compose, and rootless Podman on SELinux.
 - **100% Deterministic & CI-Ready**: Same codebase produces byte-for-byte identical graphs. Exit codes signal analysis success (`0`), errors (`1`), or security threshold violations (`2`).
 
 ---
 
-## 🏛️ High-Level System Architecture Diagrams (`gitdiagram.com` Style)
+## 🏛️ High-Level System Architecture Diagrams
 
-When explaining system design to engineers, architects, managers, or stakeholders, raw function call graphs create noise. `gitdiagram` automatically compiles a clean **C4 Container / Tier System Overview Diagram** into:
+When explaining system design to engineers, architects, managers, or stakeholders, raw function call graphs create noise. `secdiagram` automatically compiles a clean **C4 Container / Tier System Overview Diagram** into:
 - `diagram-highlevel.mmd` (Mermaid code)
 - `diagram-highlevel.png` / `.svg` (Rendered image)
 - Embedded at the top of `ARCHITECTURE.md`
@@ -115,7 +115,7 @@ flowchart TB
 
 ## 🔀 Polyglot Ecosystem Support
 
-`gitdiagram` automatically identifies project manifests and code patterns across multiple ecosystems:
+`secdiagram` automatically identifies project manifests and code patterns across multiple ecosystems:
 
 | Ecosystem | Manifests Inspected | Architectural Elements Detected |
 | :--- | :--- | :--- |
@@ -130,21 +130,21 @@ flowchart TB
 
 ### 1. Instant Run (No Installation Required)
 
-Because `gitdiagram` requires **only the Python standard library**, you can run it immediately on any machine with Python 3.10+:
+Because `secdiagram` requires **only the Python standard library**, you can run it immediately on any machine with Python 3.10+:
 
 ```bash
 # Analyze any repository:
-python gitdiagram.py --dir="."
+python secdiagram.py --dir="."
 
 # Generate both detailed architecture diagram and high-level system diagram with PNG images:
-python gitdiagram.py --dir="." --image
+python secdiagram.py --dir="." --image
 
 # Generate high-level system overview as primary diagram:
-python gitdiagram.py --dir="." --high-level --image
+python secdiagram.py --dir="." --high-level --image
 ```
 
-Default outputs are written directly to `<repo>/.gitdiagram/`:
-- `diagram-highlevel.mmd` — High-level C4 system overview diagram (`gitdiagram.com` style).
+Default outputs are written directly to `<repo>/.secdiagram/`:
+- `diagram-highlevel.mmd` — High-level C4 system overview diagram (`secdiagram.com` style).
 - `diagram-highlevel.png` — High-res rendered system architecture image (when `--image` is specified).
 - `diagram.mmd` — Detailed architecture flowchart.
 - `diagram.png` — Rendered detailed architecture image (when `--image` is specified).
@@ -165,14 +165,14 @@ cd gitgendiagram
 pip install -e .
 
 # Run on any project:
-gitdiagram --dir /path/to/project --image svg
+secdiagram --dir /path/to/project --image svg
 ```
 
 ---
 
 ## 🐳 Containerized Execution (Docker & Podman)
 
-`gitdiagram` provides an enterprise-ready, multi-stage Docker image built on `python:3.12-slim` and `node:20-slim`. It executes as an unprivileged non-root user (`uid=10001`) and comes pre-bundled with `@mermaid-js/mermaid-cli` and Chromium for **100% offline diagram image rendering**.
+`secdiagram` provides an enterprise-ready, multi-stage Docker image built on `python:3.12-slim` and `node:20-slim`. It executes as an unprivileged non-root user (`uid=10001`) and comes pre-bundled with `@mermaid-js/mermaid-cli` and Chromium for **100% offline diagram image rendering**.
 
 ### Standalone Docker Execution
 
@@ -180,26 +180,26 @@ Mount your target project to `/repo` (the container's default `WORKDIR`):
 
 ```bash
 # Linux / macOS:
-docker run --rm -v "$(pwd):/repo" gitdiagram:latest --image
+docker run --rm -v "$(pwd):/repo" secdiagram:latest --image
 
 # Windows PowerShell:
-docker run --rm -v "${PWD}:/repo" gitdiagram:latest --image
+docker run --rm -v "${PWD}:/repo" secdiagram:latest --image
 
 # Windows Command Prompt (CMD):
-docker run --rm -v "%cd%:/repo" gitdiagram:latest --image
+docker run --rm -v "%cd%:/repo" secdiagram:latest --image
 
 # RHEL / Fedora / CentOS (SELinux mode with :z flag):
-docker run --rm -v "$(pwd):/repo:z" gitdiagram:latest --image
+docker run --rm -v "$(pwd):/repo:z" secdiagram:latest --image
 ```
 
 > [!TIP]
-> **Windows Git Bash Users**: Git Bash on Windows automatically translates POSIX paths (e.g. `/repo` to `C:/Program Files/Git/repo`). `gitdiagram` includes built-in MSYS auto-recovery. You can also simply omit `--dir` entirely (the container defaults to the mounted repository) or use double slashes `--dir //repo`.
+> **Windows Git Bash Users**: Git Bash on Windows automatically translates POSIX paths (e.g. `/repo` to `C:/Program Files/Git/repo`). `secdiagram` includes built-in MSYS auto-recovery. You can also simply omit `--dir` entirely (the container defaults to the mounted repository) or use double slashes `--dir //repo`.
 
 ---
 
 ### Multi-Service Docker Compose with Local Ollama (Qwen)
 
-Run `gitdiagram` alongside a companion Ollama container over an isolated internal bridge network:
+Run `secdiagram` alongside a companion Ollama container over an isolated internal bridge network:
 
 ```bash
 # 1. Start Ollama:
@@ -208,8 +208,8 @@ docker compose up -d ollama
 # 2. Pull Qwen (or any Ollama model):
 docker compose exec ollama ollama pull qwen2.5-coder
 
-# 3. Run gitdiagram with AI-powered architectural review:
-docker compose run --rm gitdiagram --ollama qwen2.5-coder --llm-template comprehensive --image
+# 3. Run secdiagram with AI-powered architectural review:
+docker compose run --rm secdiagram --ollama qwen2.5-coder --llm-template comprehensive --image
 ```
 
 ---
@@ -219,7 +219,7 @@ docker compose run --rm gitdiagram --ollama qwen2.5-coder --llm-template compreh
 ### Detail Level Modes (`--diagram-detail`):
 
 1. **`high-level` (or `--high-level`)**:
-   Produces the clean, executive-ready C4 system diagram (`gitdiagram.com` style) showing Subsystems, Ingress, Gateways, Core Services, Databases, Caches, Brokers, and External APIs.
+   Produces the clean, executive-ready C4 system diagram (`secdiagram.com` style) showing Subsystems, Ingress, Gateways, Core Services, Databases, Caches, Brokers, and External APIs.
 2. **`architecture` (default for `diagram.mmd`)**:
    Grounded functional architecture with classes, routes, models, and external dependencies. Class methods are collapsed into parent classes and intra-feature import noise is suppressed.
 3. **`full`**:
@@ -231,16 +231,16 @@ Generate publication-ready architecture diagrams in **PNG**, **SVG**, or **PDF**
 
 ```bash
 # Default PNG output (diagram.png and diagram-highlevel.png):
-gitdiagram --image
+secdiagram --image
 
 # Crisp vector SVG output:
-gitdiagram --image svg
+secdiagram --image svg
 
 # High-resolution PDF document:
-gitdiagram --image pdf
+secdiagram --image pdf
 
 # Export all diagram formats simultaneously:
-gitdiagram --format json,md,mermaid,png,svg,pdf
+secdiagram --format json,md,mermaid,png,svg,pdf
 ```
 
 #### Rendering Providers (`--image-provider`):
@@ -253,7 +253,7 @@ gitdiagram --format json,md,mermaid,png,svg,pdf
 
 ## 🛡️ Security & IaC Static Analysis
 
-`gitdiagram` performs static security analysis across application code and infrastructure files:
+`secdiagram` performs static security analysis across application code and infrastructure files:
 
 ### Application Security Rules (SAST)
 
@@ -281,10 +281,10 @@ Turn raw graphs into executive-ready security architecture reviews using **local
 
 ```bash
 # Run with local Ollama using Qwen:
-python gitdiagram.py --ollama qwen2.5-coder
+python secdiagram.py --ollama qwen2.5-coder
 
 # Choose a specialized architectural review template:
-python gitdiagram.py --ollama qwen2.5-coder --llm-template comprehensive
+python secdiagram.py --ollama qwen2.5-coder --llm-template comprehensive
 ```
 
 ### 4 Specialized Review Profiles (`--llm-template`):
@@ -315,21 +315,21 @@ python gitdiagram.py --ollama qwen2.5-coder --llm-template comprehensive
 
 ## 🌐 100% Cross-Platform Matrix
 
-`gitdiagram` runs seamlessly across all major operating systems, shells, and enterprise server environments:
+`secdiagram` runs seamlessly across all major operating systems, shells, and enterprise server environments:
 
 | Operating System | Environments Supported | Primary Commands |
 | :--- | :--- | :--- |
-| **macOS** | Apple Silicon (`arm64`), Intel (`x86_64`) | `docker run -v "${PWD}:/repo" gitdiagram:latest --image`<br>`python gitdiagram.py --image` |
-| **Ubuntu / Debian** | Ubuntu 20.04+, Debian 11+ (`x86_64`, `arm64`) | `docker run -v "$(pwd):/repo" gitdiagram:latest --image`<br>`python3 gitdiagram.py --image` |
-| **RHEL / Rocky / Alma** | RHEL 8/9, CentOS, Fedora, Podman, SELinux | `podman run -v "$(pwd):/repo:z" gitdiagram:latest --image`<br>`docker run -v "$(pwd):/repo:z" gitdiagram:latest --image` |
-| **Windows** | PowerShell 5.1/7+, CMD, Git Bash, WSL2 | `docker run -v "${PWD}:/repo" gitdiagram:latest --image`<br>`python gitdiagram.py --image` |
+| **macOS** | Apple Silicon (`arm64`), Intel (`x86_64`) | `docker run -v "${PWD}:/repo" secdiagram:latest --image`<br>`python secdiagram.py --image` |
+| **Ubuntu / Debian** | Ubuntu 20.04+, Debian 11+ (`x86_64`, `arm64`) | `docker run -v "$(pwd):/repo" secdiagram:latest --image`<br>`python3 secdiagram.py --image` |
+| **RHEL / Rocky / Alma** | RHEL 8/9, CentOS, Fedora, Podman, SELinux | `podman run -v "$(pwd):/repo:z" secdiagram:latest --image`<br>`docker run -v "$(pwd):/repo:z" secdiagram:latest --image` |
+| **Windows** | PowerShell 5.1/7+, CMD, Git Bash, WSL2 | `docker run -v "${PWD}:/repo" secdiagram:latest --image`<br>`python secdiagram.py --image` |
 
 ---
 
 ## 📖 CLI Reference
 
 ```text
-usage: gitdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
+usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
                   [--include GLOB] [--exclude GLOB]
                   [--min-confidence MIN_CONFIDENCE] [--max-nodes MAX_NODES]
                   [--security] [--no-security] [--link-base LINK_BASE]
@@ -354,9 +354,9 @@ usage: gitdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 | Flag | Default | Description |
 | :--- | :--- | :--- |
 | `--dir DIR` | `.` | Target repository directory to inspect |
-| `--out OUT` | `<dir>/.gitdiagram` | Output directory for all generated artifacts |
+| `--out OUT` | `<dir>/.secdiagram` | Output directory for all generated artifacts |
 | `--format FORMAT` | `json,md,mermaid` | Comma-separated outputs: `json`, `md`, `mermaid`, `sarif`, `png`, `svg`, `pdf` |
-| `--high-level` | `false` | Generate high-level system overview diagram (`gitdiagram.com` style) as primary diagram |
+| `--high-level` | `false` | Generate high-level system overview diagram (`secdiagram.com` style) as primary diagram |
 | `--diagram-detail` | `architecture` | Visual detail level: `architecture`, `full`, `high-level`, `overview` |
 | `--image [FORMAT]` | `png` | Render visual diagrams to image (`png`, `svg`, `pdf`) |
 | `--image-provider` | `auto` | Image renderer: `auto`, `local` (`mmdc`), `kroki`, `mermaid.ink` |
@@ -372,13 +372,13 @@ usage: gitdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 | `--llm-timeout` | `300s` (Ollama) | Network timeout in seconds for LLM generation |
 | `--llm-max-tokens` | `1500` | Maximum completion tokens generated by the model |
 | `--quiet` | `false` | Suppress console summary output |
-| `--version` | — | Display program version (`gitdiagram 0.1.0`) |
+| `--version` | — | Display program version (`secdiagram 0.1.0`) |
 
 ---
 
 ## 🧪 Comprehensive Test Suite
 
-`gitdiagram` includes 97 unit tests covering AST discovery, call resolution, polyglot .NET and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, and deterministic CLI behaviors:
+`secdiagram` includes 97 unit tests covering AST discovery, call resolution, polyglot .NET and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, and deterministic CLI behaviors:
 
 ```bash
 # Run all unit tests:

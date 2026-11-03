@@ -13,7 +13,7 @@
 
 <p align="center">
   <b>Transform codebases into clear, human-friendly system architecture diagrams, publication-quality images, security threat models, and AI reviews.</b><br>
-  <i>100% offline-first. Zero external Python dependencies. Polyglot support across <b>.NET (C#)</b>, <b>Node.js / TypeScript</b>, <b>Python</b>, and <b>Docker / Kubernetes / Terraform</b>.</i>
+  <i>100% offline-first. Zero external Python dependencies. Polyglot support across <b>.NET (C#)</b>, <b>Java / Spring Boot</b>, <b>Node.js / TypeScript</b>, <b>Python</b>, and <b>Docker / Kubernetes / Terraform</b>.</i>
 </p>
 
 ---
@@ -37,14 +37,16 @@
 
 - **Pure Python Standard Library (`zero dependencies`)**: Runs instantly without downloading hundreds of megabytes of third-party wheels. Zero supply chain attack surface.
 - **High-Level System Overview Diagrams**: Automatically produces high-level C4-style tier diagrams (`diagram-highlevel.mmd` & `diagram-highlevel.png`) explaining how Clients, API Gateways, Microservices, Databases, Caches, Message Brokers, and Runtime Platforms connect.
-- **Polyglot & Multi-Project Flexibility**: First-class detection and architectural relationship mapping for **.NET (C#/F#)** solutions (`*.csproj`, `<ProjectReference>`, ASP.NET Core, EF Core, MediatR), **Node.js / TypeScript** (`package.json`, Express, NestJS, Next.js, Prisma, TypeORM), and **Python** (FastAPI, Flask, Django, Celery, SQLAlchemy).
+- **Polyglot & Multi-Project Flexibility**: First-class detection and architectural relationship mapping for **.NET (C#/F#)** solutions (`*.csproj`, `<ProjectReference>`, ASP.NET Core, EF Core, MediatR), **Java / Spring Boot** (`pom.xml`, `build.gradle`, controllers, services, repositories, entities), **Node.js / TypeScript** (`package.json`, Express, NestJS, Next.js, Prisma, TypeORM), and **Python** (FastAPI, Flask, Django, Celery, SQLAlchemy).
 - **Multi-Format Image Rendering**: Export directly to **PNG**, **SVG**, or **PDF**. Uses pre-bundled offline Mermaid CLI (`mmdc`) + headless Chromium or zero-dependency HTTP fallbacks (Kroki, mermaid.ink).
-- **Security & IaC SAST Overlay**: Discovers entrypoints, traces taint dataflows to dangerous sinks, catches hardcoded secrets, and audits Dockerfile, Kubernetes, Terraform, and GitHub Actions configurations with exact `path:line` citations.
-- **SARIF Code-Scanning Export**: Generates industry-standard `security.sarif` for seamless integration into GitHub Advanced Security, GitLab SAST, or DefectDojo.
+- **Security & IaC SAST Overlay**: Discovers entrypoints, traces taint dataflows to dangerous sinks, catches hardcoded secrets, and audits Dockerfile, Kubernetes, Terraform, and GitHub Actions configurations with exact `path:line` citations. Findings carry a full source-to-sink taint path plus scope/coverage metadata in Markdown, HTML, JSON, and SARIF.
+- **SARIF Code-Scanning Export**: Generates industry-standard `security.sarif` for seamless integration into GitHub Advanced Security, GitLab SAST, or DefectDojo. Results include stable partial fingerprints, source-to-sink `codeFlows`, rule precision/security metadata, baseline suppressions, and an invocation coverage record.
+- **Security Baseline (`security.baseline.json`)**: Triage known findings once and commit the baseline; `--baseline` then fails CI only on **new** findings while `--create-baseline` regenerates it. Note the suppressed counts in `graph.json`, Markdown, and the HTML report.
 - **Self-Contained Interactive HTML Report** (`report.html`): A single, zero-dependency HTML file embedding the full graph, security findings with copyable source snippets, subsystem architecture, diagram sources, filterable dependency tables, data-quality distributions, and dark mode. Use `--mermaid-js <bundle>` for a fully offline report.
 - **AI Architectural & Threat Modeling Reviews**: Integrates with local/containerized **Ollama (Qwen, LLaMA, DeepSeek)** or OpenAI endpoints. The LLM receives the deterministic graph and produces evidence-grounded reviews citing exact `path:line` with zero hallucinations.
 - **Hardened Multi-Stage Container**: Runs securely as an unprivileged non-root user (`secdiagram`, UID `10001`), compatible with Docker, Docker Compose, and rootless Podman on SELinux.
 - **100% Deterministic & CI-Ready**: Same codebase produces byte-for-byte identical graphs. Exit codes signal analysis success (`0`), errors (`1`), or security threshold violations (`2`).
+- **Pinned Supply Chain**: Zero runtime dependencies; development tools use exact `==` pins; CI actions use full commit SHAs; container images use exact tags plus `@sha256:` digests; Mermaid CLI is installed from a committed npm lockfile via `npm ci`.
 
 ---
 
@@ -122,6 +124,7 @@ flowchart TB
 | :--- | :--- | :--- |
 | **.NET (C# / F#)** | `*.sln`, `*.csproj`, `*.fsproj` | • Direct project dependency arrows via `<ProjectReference>`<br>• ASP.NET Core Web API, Controllers (`[ApiController]`, `[HttpGet]`), Minimal APIs (`app.MapGet`)<br>• Entity Framework Core (SQL Server, PostgreSQL/Npgsql, SQLite, Cosmos DB) & DbContexts<br>• MediatR CQRS handlers (`IRequestHandler<T>`), MassTransit / RabbitMQ brokers<br>• StackExchange.Redis cache, Stripe.net, SendGrid, AWS/Azure SDKs |
 | **Node.js / TypeScript** | `package.json`, workspaces, `schema.prisma` | • Frameworks: Express.js, Fastify, NestJS, Next.js, Hono, Koa, React/Vue frontends<br>• ORMs: Prisma (auto-counts models & datasource provider), TypeORM, Mongoose (MongoDB), Sequelize<br>• Caching & Queues: Redis (`ioredis`, `redis`), BullMQ (`bullmq`), RabbitMQ (`amqplib`), Kafka<br>• Integrations: Stripe, OpenAI, Anthropic, AWS SDK, SendGrid |
+| **Java / Spring Boot** | `pom.xml`, `build.gradle(.kts)` | • Stereotypes: `@RestController`, `@Controller`, `@Service`, `@Repository`, `@Configuration`, `@Entity`<br>• Routes from `@GetMapping`/`@PostMapping`/`@RequestMapping` with class-level prefixes<br>• Dependency injection (`@Autowired`, `@Resource`, `@Inject`) and instantiation/call edges<br>• SAST: SQLi, command injection, unsafe deserialization, SSTI, weak crypto, SSRF, path traversal, XSS, config secrets |
 | **Python** | `pyproject.toml`, `requirements.txt`, `*.py` AST | • Frameworks: FastAPI, Flask, Django, Starlette, Tornado, Celery, Click, Typer<br>• ORMs & DBs: SQLAlchemy, Django ORM, Tortoise-ORM, asyncpg, psycopg2, pymongo<br>• Taint tracking: sources to dangerous execution/injection sinks (CWE-78, CWE-89, CWE-502) |
 | **Infrastructure & IaC** | `docker-compose.yml`, `Dockerfile`, K8s, Terraform | • Docker Compose service images, published ports, and `depends_on` relationships<br>• Dockerfile unpinned tags, non-root users, exposed ports<br>• Kubernetes manifests & Terraform cloud security rules |
 
@@ -151,7 +154,8 @@ Default outputs are written directly to `<repo>/.secdiagram/`:
 - `diagram.png` — Rendered detailed architecture image (when `--image` is specified).
 - `ARCHITECTURE.md` — Complete architecture report with the high-level diagram embedded at the top.
 - `graph.json` — Machine-readable graph schema (nodes, edges, confidence, features, findings).
-- `security.sarif` — SARIF code-scanning findings.
+- `security.sarif` — SARIF code-scanning findings with taint `codeFlows`, stable fingerprints, rule metadata, and baseline suppressions.
+- `security.baseline.json` — Generated with `--create-baseline`; commit and pass via `--baseline` to suppress known findings.
 - `report.html` — Self-contained interactive HTML report (graphs, findings with source snippets, filtering, diagram viewer; add `--format html`).
 
 ---
@@ -174,24 +178,24 @@ secdiagram --dir /path/to/project --image svg
 
 ## 🐳 Containerized Execution (Docker & Podman)
 
-`secdiagram` provides an enterprise-ready, multi-stage Docker image built on `python:3.12-slim` and `node:20-slim`. It executes as an unprivileged non-root user (`uid=10001`) and comes pre-bundled with `@mermaid-js/mermaid-cli` and Chromium for **100% offline diagram image rendering**.
+`secdiagram` provides an enterprise-ready, multi-stage Docker image built on digest-pinned `python:3.12-slim` and `node:24-slim`. It executes as an unprivileged non-root user (`uid=10001`) and comes pre-bundled with `@mermaid-js/mermaid-cli` (installed from a committed lockfile) and Chromium for **100% offline diagram image rendering**.
 
 ### Standalone Docker Execution
 
-Mount your target project to `/repo` (the container's default `WORKDIR`):
+Mount your target project to `/repo` (the container's default `WORKDIR`). Build the local image once with `docker build -t secdiagram:local .`:
 
 ```bash
 # Linux / macOS:
-docker run --rm -v "$(pwd):/repo" secdiagram:latest --image
+docker run --rm -v "$(pwd):/repo" secdiagram:local --image
 
 # Windows PowerShell:
-docker run --rm -v "${PWD}:/repo" secdiagram:latest --image
+docker run --rm -v "${PWD}:/repo" secdiagram:local --image
 
 # Windows Command Prompt (CMD):
-docker run --rm -v "%cd%:/repo" secdiagram:latest --image
+docker run --rm -v "%cd%:/repo" secdiagram:local --image
 
 # RHEL / Fedora / CentOS (SELinux mode with :z flag):
-docker run --rm -v "$(pwd):/repo:z" secdiagram:latest --image
+docker run --rm -v "$(pwd):/repo:z" secdiagram:local --image
 ```
 
 > [!TIP]
@@ -321,10 +325,10 @@ python secdiagram.py --ollama qwen2.5-coder --llm-template comprehensive
 
 | Operating System | Environments Supported | Primary Commands |
 | :--- | :--- | :--- |
-| **macOS** | Apple Silicon (`arm64`), Intel (`x86_64`) | `docker run -v "${PWD}:/repo" secdiagram:latest --image`<br>`python secdiagram.py --image` |
-| **Ubuntu / Debian** | Ubuntu 20.04+, Debian 11+ (`x86_64`, `arm64`) | `docker run -v "$(pwd):/repo" secdiagram:latest --image`<br>`python3 secdiagram.py --image` |
-| **RHEL / Rocky / Alma** | RHEL 8/9, CentOS, Fedora, Podman, SELinux | `podman run -v "$(pwd):/repo:z" secdiagram:latest --image`<br>`docker run -v "$(pwd):/repo:z" secdiagram:latest --image` |
-| **Windows** | PowerShell 5.1/7+, CMD, Git Bash, WSL2 | `docker run -v "${PWD}:/repo" secdiagram:latest --image`<br>`python secdiagram.py --image` |
+| **macOS** | Apple Silicon (`arm64`), Intel (`x86_64`) | `docker run -v "${PWD}:/repo" secdiagram:local --image`<br>`python secdiagram.py --image` |
+| **Ubuntu / Debian** | Ubuntu 20.04+, Debian 11+ (`x86_64`, `arm64`) | `docker run -v "$(pwd):/repo" secdiagram:local --image`<br>`python3 secdiagram.py --image` |
+| **RHEL / Rocky / Alma** | RHEL 8/9, CentOS, Fedora, Podman, SELinux | `podman run -v "$(pwd):/repo:z" secdiagram:local --image`<br>`docker run -v "$(pwd):/repo:z" secdiagram:local --image` |
+| **Windows** | PowerShell 5.1/7+, CMD, Git Bash, WSL2 | `docker run -v "${PWD}:/repo" secdiagram:local --image`<br>`python secdiagram.py --image` |
 
 ---
 
@@ -334,6 +338,7 @@ python secdiagram.py --ollama qwen2.5-coder --llm-template comprehensive
 usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
                   [--include GLOB] [--exclude GLOB]
                   [--min-confidence MIN_CONFIDENCE] [--max-nodes MAX_NODES]
+                  [--min-finding-confidence SCORE]
                   [--security] [--no-security] [--link-base LINK_BASE]
                   [--image [FORMAT]] [--image-format {png,svg,pdf}]
                   [--image-provider {auto,local,kroki,mermaid.ink}]
@@ -348,6 +353,7 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
                   [--llm-template {comprehensive,threat-model,remediation,compliance}]
                   [--llm-timeout LLM_TIMEOUT] [--llm-max-tokens LLM_MAX_TOKENS]
                   [--fail-on {critical,high,medium,low,info,none}]
+                  [--baseline FILE] [--create-baseline]
                   [--quiet] [--version]
 ```
 
@@ -368,7 +374,11 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 | `--diagram-theme` | `modern` | Visual theme palette: `modern` (Tailwind) or `classic` |
 | `--link-base URL` | `None` | Prefix for clickable source links (e.g. `https://github.com/org/repo/blob/main`) |
 | `--security / --no-security` | enabled | Toggle SAST security rules and IaC configuration checks |
+| `--min-confidence SCORE` | `0.5` | Drop call/inheritance edges below this confidence |
+| `--min-finding-confidence SCORE` | `0.0` | Drop security findings below this confidence (`0.0`-`1.0`); the applied floor is recorded in reports |
 | `--fail-on SEVERITY` | `none` | Return exit code `2` if findings meet or exceed severity threshold |
+| `--baseline FILE` | `none` | Suppress findings listed in `security.baseline.json` so CI fails only on NEW findings; report artifacts note the suppressed counts |
+| `--create-baseline` | `false` | Generate `security.baseline.json` from the current scan (path from `--baseline`, default `<out>/security.baseline.json`) and exit `0` |
 | `--ollama [MODEL]` | `qwen2.5-coder` | Generate AI review using local Ollama (`qwen2.5-coder`, `qwen2.5:7b`, etc.) |
 | `--llm-template` | `comprehensive` | Prompt profile: `comprehensive`, `threat-model`, `remediation`, `compliance` |
 | `--llm-timeout` | `300s` (Ollama) | Network timeout in seconds for LLM generation |
@@ -380,7 +390,7 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 
 ## 🧪 Comprehensive Test Suite
 
-`secdiagram` includes 97 unit tests covering AST discovery, call resolution, polyglot .NET and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, and deterministic CLI behaviors:
+`secdiagram` includes 134 unit tests covering AST discovery, call resolution, polyglot .NET, Java/Spring, and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, supply-chain pinning, and deterministic CLI behaviors:
 
 ```bash
 # Run all unit tests:

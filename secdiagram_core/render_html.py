@@ -481,6 +481,12 @@ __MERMAID_SCRIPT__
       sec.appendChild(el("div", "mini muted", "No security or IaC findings were reported for this repository."));
     } else {
       bar(sec, sevMap, function (s) { return "rgb(" + SEV_RGB[s] + ")"; }, SEVS);
+      if (M.security_baseline) {
+        var bl = M.security_baseline;
+        var blNote = el("div", "mini muted", bl.known + " finding(s) suppressed by baseline '" + (bl.file || "security.baseline.json") + "'; " + bl.new + " new.");
+        blNote.style.marginTop = "10px";
+        sec.appendChild(blNote);
+      }
       var cats = {};
       DATA.findings.forEach(function (f) { cats[f.category] = (cats[f.category] || 0) + 1; });
       var lead = el("div", "mini muted", "findings by category (top 8)");
@@ -698,7 +704,7 @@ __MERMAID_SCRIPT__
     var tbl = el("table", "tbl");
     var thead = el("thead");
     var hr = el("tr");
-    ["Severity", "Finding", "Category / CWE", "Confidence", "Location", ""].forEach(function (h) {
+    ["Severity", "Finding", "Category / CWE", "Confidence", "Location", "Taint path", ""].forEach(function (h) {
       hr.appendChild(el("th", null, h));
     });
     thead.appendChild(hr);
@@ -751,6 +757,17 @@ __MERMAID_SCRIPT__
     catSel.addEventListener("change", function () { findingView.category = catSel.value; draw(); });
     toolbar.appendChild(catSel);
 
+    var newBtn = el("button", "", "new only");
+    newBtn.type = "button";
+    newBtn.title = "Hide findings already covered by the security baseline";
+    if (findingView.newOnly) newBtn.className = "on";
+    newBtn.addEventListener("click", function () {
+      findingView.newOnly = !findingView.newOnly;
+      newBtn.className = findingView.newOnly ? "on" : "";
+      draw();
+    });
+    toolbar.appendChild(newBtn);
+
     var minConf = el("input");
     minConf.type = "number"; minConf.step = "0.05"; minConf.min = "0"; minConf.max = "1";
     minConf.style.width = "76px";
@@ -783,14 +800,17 @@ __MERMAID_SCRIPT__
     }
     function draw() {
       tbody.textContent = "";
+      var hasBaseline = DATA.findings.some(function (f) { return f.baseline; });
+      newBtn.style.display = hasBaseline ? "" : "none";
       var rows = DATA.findings.filter(function (f) {
         var anySev = !Object.keys(findingView.severities).some(function (k) { return findingView.severities[k]; });
         var okSev = anySev || findingView.severities[f.severity];
         var okCat = findingView.category === "all" || f.category === findingView.category;
         var okConf = (f.confidence || 0) >= findingView.minConf;
+        var okNew = !findingView.newOnly || !f.baseline;
         var okQ = !findingView.q || (f.title + " " + f.message + " " + f.id + " " + (f.cwe || "") + " " + f.category + " " + f.recommendation)
           .toLowerCase().indexOf(findingView.q.toLowerCase()) >= 0;
-        return okSev && okCat && okConf && okQ;
+        return okSev && okCat && okConf && okNew && okQ;
       });
       if (findingView.sort === "severity") {
         rows.sort(function (a, b) {
@@ -810,6 +830,14 @@ __MERMAID_SCRIPT__
         var tdSev = el("td"); tdSev.appendChild(sevChip(f.severity)); tr.appendChild(tdSev);
         var tdTitle = el("td");
         tdTitle.appendChild(el("b", null, f.title));
+        if (f.baseline) {
+          var knownBadge = el("span", "mini muted", " in baseline");
+          knownBadge.style.border = "1px solid var(--border)";
+          knownBadge.style.borderRadius = "6px";
+          knownBadge.style.padding = "0 4px";
+          knownBadge.style.marginLeft = "5px";
+          tdTitle.appendChild(knownBadge);
+        }
         tdTitle.appendChild(el("div", "mini muted", f.message));
         tr.appendChild(tdTitle);
         var tdCat = el("td", "mini");
@@ -829,13 +857,21 @@ __MERMAID_SCRIPT__
         if (loc) tdLoc.appendChild(locBtn(loc.path, loc.line, loc.col));
         if ((f.evidence || []).length > 1) tdLoc.appendChild(el("div", "mini muted", "+" + (f.evidence.length - 1) + " more evidence"));
         tr.appendChild(tdLoc);
+        var tdTrace = el("td", "mini");
+        var trace = f.trace || [];
+        if (trace.length) {
+          tdTrace.appendChild(el("div", null, trace.map(function (l) { return l.path + ":" + l.line; }).join(" -> ")));
+        } else {
+          tdTrace.textContent = "-";
+        }
+        tr.appendChild(tdTrace);
         var tdExp = el("td", "mini muted", "detail");
         tr.appendChild(tdExp);
         tableBody.appendChild(tr);
         var det = el("tr", "detail");
         det.id = "detail-finding-" + f.id;
         det.style.display = "none";
-        var dt = el("td"); dt.setAttribute("colspan", "6");
+        var dt = el("td"); dt.setAttribute("colspan", "7");
         det.appendChild(dt);
         tableBody.appendChild(det);
         tr.addEventListener("click", function () {
@@ -851,7 +887,9 @@ __MERMAID_SCRIPT__
         });
       });
       tbl.appendChild(tableBody);
-      counter.textContent = "Showing " + rows.length + " of " + DATA.findings.length + " findings";
+      counter.textContent
+        = "Showing " + rows.length + " of " + DATA.findings.length + " findings"
+        + (hasBaseline ? " (" + DATA.findings.filter(function (f) { return f.baseline; }).length + " in baseline)" : "");
     }
     draw();
   };
@@ -871,6 +909,16 @@ __MERMAID_SCRIPT__
       evList.appendChild(li);
     });
     dt.appendChild(evList);
+    if ((f.trace || []).length) {
+      dt.appendChild(el("div", "mini muted", "Taint path (source -> sink)"));
+      var traceList = el("ol", "mini");
+      f.trace.forEach(function (loc) {
+        var li = el("li", null);
+        li.appendChild(locBtn(loc.path, loc.line, loc.col));
+        traceList.appendChild(li);
+      });
+      dt.appendChild(traceList);
+    }
     if (f.snippet && f.snippet.lines && f.snippet.lines.length && f.loc) {
       dt.appendChild(el("div", "mini muted", "Source context from " + f.loc.path));
       var pre = el("pre", "src");
@@ -897,10 +945,11 @@ __MERMAID_SCRIPT__
   }
 
   function findingsCsv() {
-    var rows = [["id", "severity", "category", "cwe", "confidence", "file", "line", "title", "message", "recommendation"]];
+    var rows = [["id", "severity", "category", "cwe", "confidence", "file", "line", "title", "message", "taint_path", "recommendation", "in_baseline"]];
     DATA.findings.forEach(function (f) {
       var loc = f.loc || (f.evidence && f.evidence[0]) || {};
-      rows.push([f.id, f.severity, f.category, f.cwe || "", f.confidence, loc.path || "", loc.line || "", f.title, f.message, f.recommendation]);
+      var taint = (f.trace || []).map(function (l) { return l.path + ":" + l.line; }).join(" -> ");
+      rows.push([f.id, f.severity, f.category, f.cwe || "", f.confidence, loc.path || "", loc.line || "", f.title, f.message, taint, f.recommendation, f.baseline ? "known" : "new"]);
     });
     return rows.map(function (r) {
       return r.map(function (cell) {
@@ -1227,6 +1276,12 @@ __MERMAID_SCRIPT__
     metaRow("Branch / commit", (M.branch || "-") + " / " + (M.commit ? String(M.commit).slice(0, 12) : "-"));
     metaRow("Python files", S.python_files === undefined ? "-" : String(S.python_files));
     metaRow("IaC files", S.iac_files === undefined ? "-" : String(S.iac_files));
+    metaRow("Files discovered", M.files_discovered === undefined ? "-" : String(M.files_discovered));
+    metaRow("Files skipped", M.files_skipped === undefined ? "-" : String(M.files_skipped));
+    metaRow("Languages", Object.keys(M.languages || {}).sort().map(function (k) { return k + " (" + M.languages[k] + ")"; }).join(", ") || "(none detected)");
+    metaRow("Unsupported security languages", (M.unsupported_security_languages || []).join(", ") || "(none)");
+    metaRow("Config hash", M.config_hash || "-");
+    metaRow("Finding confidence floor", M.finding_confidence_floor === undefined ? "-" : String(M.finding_confidence_floor));
     metaRow("Min edge confidence", S.min_confidence === undefined ? "-" : String(S.min_confidence));
     metaRow("Include globs", (S.include || []).join(", ") || "(none)");
     metaRow("Exclude globs", (S.exclude || []).join(", ") || "(none)");

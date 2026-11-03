@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
 
 from . import __version__
 from .analyzer import AnalysisConfig, run_analysis
+from .baseline import apply_baseline, ignore_baseline, load_baseline, write_baseline
 from .high_level import build_high_level_architecture, render_mermaid_highlevel
 from .llm import NarrativeError, generate_narrative
 from .model import SEVERITY_RANK
@@ -65,6 +67,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.5,
         help="drop call/inheritance edges below this confidence (default: 0.5)",
+    )
+    parser.add_argument(
+        "--min-finding-confidence",
+        type=float,
+        default=0.0,
+        metavar="SCORE",
+        help="drop security findings below this confidence (0.0-1.0; default: 0.0)",
     )
     parser.add_argument(
         "--max-nodes",
@@ -218,6 +227,17 @@ def build_parser() -> argparse.ArgumentParser:
         default="none",
         help="exit with code 2 when a finding at or above this severity exists",
     )
+    parser.add_argument(
+        "--baseline",
+        default=None,
+        metavar="FILE",
+        help="suppress findings listed in this baseline file so CI fails only on new findings",
+    )
+    parser.add_argument(
+        "--create-baseline",
+        action="store_true",
+        help="write security.baseline.json from the current scan (path from --baseline, default <out>/security.baseline.json)",
+    )
     parser.add_argument("--quiet", action="store_true", help="suppress the summary")
     parser.add_argument("--version", action="version", version=f"secdiagram {__version__}")
     return parser
@@ -279,15 +299,68 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     graph = result.graph
+    if args.min_finding_confidence > 0:
+        graph.findings = [
+            finding
+            for finding in graph.findings
+            if finding.confidence >= args.min_finding_confidence
+        ]
+    graph.meta["finding_confidence_floor"] = args.min_finding_confidence
     out.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
-    meta = {
-        "name": result.repo.name,
-        "commit": result.repo.commit,
-        "branch": result.repo.branch,
-        "dirty": result.repo.dirty,
-        "analysis": graph.meta.get("analysis", {}),
-    }
+
+    baseline_mode = args.create_baseline or args.baseline is not None
+    baseline_path = (
+        _normalize_cli_path(args.baseline)
+        if args.baseline
+        else out / "security.baseline.json"
+    )
+    baseline_label = args.baseline if args.baseline else baseline_path.name
+    if baseline_mode:
+        if args.create_baseline:
+            count = write_baseline(graph, baseline_path)
+            apply_baseline(graph, {finding.id for finding in graph.findings}, baseline_label)
+            print(f"secdiagram: created baseline with {count} finding(s): {baseline_path}", file=sys.stderr)
+            written.append(baseline_path)
+        else:
+            baseline_ids: set[str] = set()
+            try:
+                baseline_ids = load_baseline(baseline_path)
+            except FileNotFoundError:
+                print(
+                    f"secdiagram: baseline file not found: {baseline_path} "
+                    f"(no findings suppressed; create one with --create-baseline)",
+                    file=sys.stderr,
+                )
+                ignore_baseline(graph, baseline_label)
+            except (ValueError, OSError, json.JSONDecodeError) as exc:
+                print(
+                    f"secdiagram: ignoring malformed baseline ({exc}); "
+                    "regenerate it with --create-baseline",
+                    file=sys.stderr,
+                )
+                ignore_baseline(graph, baseline_label)
+            else:
+                known, new = apply_baseline(graph, baseline_ids, baseline_label)
+                print(
+                    f"secdiagram: baseline {baseline_label} suppresses {known} known finding(s); "
+                    f"{new} new finding(s) remain",
+                    file=sys.stderr,
+                )
+
+    meta = dict(graph.meta)
+    meta.update(
+        {
+            "name": result.repo.name,
+            "commit": result.repo.commit,
+            "branch": result.repo.branch,
+            "dirty": result.repo.dirty,
+            "analysis": graph.meta.get("analysis", {}),
+            "finding_confidence_floor": args.min_finding_confidence,
+        }
+    )
+    if "security_baseline" in graph.meta:
+        meta["security_baseline"] = graph.meta["security_baseline"]
 
     if args.high_level:
         args.diagram_detail = "high-level"
@@ -461,6 +534,10 @@ def main(argv: list[str] | None = None) -> int:
         for finding in graph.findings:
             counts[finding.severity] = counts.get(finding.severity, 0) + 1
         severity_text = ", ".join(f"{key}={counts[key]}" for key in ("critical", "high", "medium", "low", "info") if key in counts)
+        baseline_info = ""
+        if baseline_mode:
+            info = graph.meta.get("security_baseline") or {}
+            baseline_info = f", {info.get('known', 0)} known in baseline, {info.get('new', 0)} new"
         polyglot_bits = []
         if hla.languages:
             polyglot_bits.append(f"languages: {', '.join(sorted(hla.languages))}")
@@ -472,6 +549,7 @@ def main(argv: list[str] | None = None) -> int:
             f"{len(graph.edges)} edges, {len(graph.features)} features, {len(hla.subsystems)} subsystems, "
             f"{len(graph.findings)} findings"
             + (f" ({severity_text})" if severity_text else "")
+            + (baseline_info if baseline_info else "")
             + polyglot_info
         )
         if result.parse_errors:
@@ -481,6 +559,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.fail_on != "none":
         threshold = SEVERITY_RANK[args.fail_on]
-        if any(SEVERITY_RANK.get(finding.severity, 0) >= threshold for finding in graph.findings):
+        if any(
+            SEVERITY_RANK.get(finding.severity, 0) >= threshold and not finding.baseline
+            for finding in graph.findings
+        ):
             return 2
     return 0

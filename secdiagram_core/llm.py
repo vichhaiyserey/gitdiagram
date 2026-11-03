@@ -223,10 +223,10 @@ def generate_narrative(
     timeout: float | None = None,
     max_tokens: int | None = None,
 ) -> str:
-    env_provider = os.environ.get("GITDIAGRAM_LLM_PROVIDER", "").strip().lower()
+    env_provider = os.environ.get("SECDIAGRAM_LLM_PROVIDER", "").strip().lower()
     chosen_provider = (provider or env_provider or "").lower()
 
-    env_base = os.environ.get("GITDIAGRAM_LLM_BASE_URL")
+    env_base = os.environ.get("SECDIAGRAM_LLM_BASE_URL")
     target_base = (base_url or env_base or "").rstrip("/")
 
     is_ollama = (
@@ -236,7 +236,7 @@ def generate_narrative(
     )
 
     if timeout is None:
-        env_timeout = os.environ.get("GITDIAGRAM_LLM_TIMEOUT")
+        env_timeout = os.environ.get("SECDIAGRAM_LLM_TIMEOUT")
         if env_timeout:
             try:
                 timeout = float(env_timeout)
@@ -246,7 +246,7 @@ def generate_narrative(
             timeout = 300.0 if is_ollama else 120.0
 
     if max_tokens is None:
-        env_tokens = os.environ.get("GITDIAGRAM_LLM_MAX_TOKENS")
+        env_tokens = os.environ.get("SECDIAGRAM_LLM_MAX_TOKENS")
         if env_tokens:
             try:
                 max_tokens = int(env_tokens)
@@ -261,27 +261,27 @@ def generate_narrative(
         final_base = target_base or "http://localhost:11434/v1"
         final_model = (
             model
-            or os.environ.get("GITDIAGRAM_LLM_MODEL")
+            or os.environ.get("SECDIAGRAM_LLM_MODEL")
             or os.environ.get("OLLAMA_MODEL")
             or "qwen2.5-coder"
         )
         final_key = (
             api_key
-            or os.environ.get("GITDIAGRAM_LLM_API_KEY")
+            or os.environ.get("SECDIAGRAM_LLM_API_KEY")
             or os.environ.get("OPENAI_API_KEY")
             or "ollama"
         )
     else:
         final_base = target_base or "https://api.openai.com/v1"
-        final_model = model or os.environ.get("GITDIAGRAM_LLM_MODEL") or "gpt-4o-mini"
+        final_model = model or os.environ.get("SECDIAGRAM_LLM_MODEL") or "gpt-4o-mini"
         final_key = (
             api_key
-            or os.environ.get("GITDIAGRAM_LLM_API_KEY")
+            or os.environ.get("SECDIAGRAM_LLM_API_KEY")
             or os.environ.get("OPENAI_API_KEY")
         )
         if not final_key:
             raise NarrativeError(
-                "no LLM key found; set GITDIAGRAM_LLM_API_KEY or OPENAI_API_KEY, "
+                "no LLM key found; set SECDIAGRAM_LLM_API_KEY or OPENAI_API_KEY, "
                 "or use local Ollama with --ollama"
             )
 
@@ -349,7 +349,7 @@ def generate_narrative(
                 raise NarrativeError(
                     f"Ollama generation timed out after {timeout:.0f}s for model '{final_model}'. "
                     "When running local models on CPU, generation can take several minutes. "
-                    "Try increasing the timeout with '--llm-timeout 600' (or setting GITDIAGRAM_LLM_TIMEOUT=600), "
+                    "Try increasing the timeout with '--llm-timeout 600' (or setting SECDIAGRAM_LLM_TIMEOUT=600), "
                     "or try a lighter model like 'qwen2.5-coder:1.5b'."
                 ) from exc
             raise NarrativeError(f"LLM request timed out after {timeout:.0f}s: {exc}") from exc

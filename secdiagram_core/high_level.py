@@ -618,6 +618,153 @@ def _scan_nodejs(
     return subsystems, connections
 
 
+def _scan_java(
+    root: Path,
+    existing_subsystems: list[Subsystem],
+) -> tuple[list[Subsystem], list[SubsystemConnection]]:
+    subsystems: list[Subsystem] = []
+    connections: list[SubsystemConnection] = []
+
+    project_files: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = [
+            d for d in dirnames if d not in {".git", ".secdiagram", "target", "build", ".gradle", "out"}
+        ]
+        for f in filenames:
+            if f == "pom.xml" or f in {"build.gradle", "build.gradle.kts"}:
+                project_files.append(Path(dirpath) / f)
+
+    if not project_files:
+        return subsystems, connections
+
+    for proj in sorted(project_files, key=lambda path: str(path)):
+        name = proj.parent.name
+        deps: set[str] = set()
+        if proj.name == "pom.xml":
+            try:
+                tree = ET.parse(proj)
+            except (ET.ParseError, OSError):
+                continue
+            for dep in tree.getroot().iter():
+                if dep.tag.rsplit("}", 1)[-1] != "dependency":
+                    continue
+                artifact = ""
+                for child in dep:
+                    if child.tag.rsplit("}", 1)[-1] == "artifactId":
+                        artifact = (child.text or "").strip()
+                if artifact:
+                    deps.add(artifact.lower())
+            for child in tree.getroot():
+                if child.tag.rsplit("}", 1)[-1] == "artifactId" and (child.text or "").strip():
+                    name = (child.text or "").strip()
+                    break
+        else:
+            try:
+                text = proj.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            match = re.search(r'rootProject\.name\s*=\s*["\']([^"\']+)["\']', text)
+            if match:
+                name = match.group(1)
+            deps = {
+                dep.lower()
+                for dep in re.findall(r"implementation\s*[('\"]\s*([\w.\-]+:[\w.\-]+)", text)
+            }
+
+        sub_id = _clean_id(f"java_{name}")
+        if any(existing.id == sub_id for existing in subsystems):
+            continue
+        endpoint_count = 0
+        controller_count = 0
+        service_count = 0
+        entity_count = 0
+        class_count = 0
+
+        for dp, dns, fns in os.walk(proj.parent):
+            dns[:] = [d for d in dns if d not in {"target", "build", ".gradle", "out"}]
+            for fn in fns:
+                if not fn.endswith(".java"):
+                    continue
+                try:
+                    code = (Path(dp) / fn).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                endpoint_count += len(re.findall(r"@(?:Get|Post|Put|Delete|Patch|Request)Mapping\b", code))
+                controller_count += len(re.findall(r"@(?:Rest)?Controller\b", code))
+                service_count += len(re.findall(r"@Service\b", code))
+                entity_count += len(re.findall(r"@Entity\b", code))
+                class_count += len(re.findall(r"\b(?:class|interface|record|enum)\s+[A-Za-z_$][\w$]*", code))
+
+        is_spring = any("spring-boot" in dep or "spring-web" in dep for dep in deps) or controller_count > 0
+        tier = "services"
+        kind = "service"
+        technology = "Java"
+
+        if is_spring and controller_count > 0:
+            tier = "gateway"
+            kind = "api"
+            technology = "Spring Boot API"
+        elif is_spring:
+            technology = "Spring Boot Service"
+
+        details: list[str] = []
+        if endpoint_count:
+            details.append(f"{endpoint_count} Endpoints")
+        if controller_count:
+            details.append(f"{controller_count} Controllers")
+        if service_count:
+            details.append(f"{service_count} Services")
+        if entity_count:
+            details.append(f"{entity_count} Entities")
+        if class_count:
+            details.append(f"{class_count} Classes")
+
+        subsystems.append(
+            Subsystem(
+                id=sub_id,
+                name=name,
+                tier=tier,
+                kind=kind,
+                technology=technology,
+                details=details,
+                path=str(proj.parent.relative_to(root)),
+            )
+        )
+
+        if any("postgres" in dep for dep in deps):
+            db_sub = _find_or_create_subsystem(
+                existing_subsystems, "db_postgres", "PostgreSQL Database", "data", "database", "PostgreSQL"
+            )
+            connections.append(SubsystemConnection(src=sub_id, dst=db_sub.id, label="Reads / Writes", style="solid"))
+        if any("mysql" in dep or "mariadb" in dep for dep in deps):
+            db_sub = _find_or_create_subsystem(
+                existing_subsystems, "db_mysql", "MySQL Database", "data", "database", "MySQL / MariaDB"
+            )
+            connections.append(SubsystemConnection(src=sub_id, dst=db_sub.id, label="Reads / Writes", style="solid"))
+        if any("mongodb" in dep for dep in deps):
+            mongo_sub = _find_or_create_subsystem(
+                existing_subsystems, "db_mongo", "MongoDB Database", "data", "database", "MongoDB NoSQL"
+            )
+            connections.append(SubsystemConnection(src=sub_id, dst=mongo_sub.id, label="Persists Documents", style="solid"))
+        if any("redis" in dep for dep in deps):
+            redis_sub = _find_or_create_subsystem(
+                existing_subsystems, "cache_redis", "Redis Cache", "data", "cache", "Redis Store"
+            )
+            connections.append(SubsystemConnection(src=sub_id, dst=redis_sub.id, label="Caches / Reads", style="dotted"))
+        if any("kafka" in dep for dep in deps):
+            kafka_sub = _find_or_create_subsystem(
+                existing_subsystems, "queue_kafka", "Kafka Event Bus", "data", "queue", "Apache Kafka"
+            )
+            connections.append(SubsystemConnection(src=sub_id, dst=kafka_sub.id, label="Pub/Sub Events", style="dotted"))
+        if any("rabbitmq" in dep or "amqp" in dep for dep in deps):
+            rabbit_sub = _find_or_create_subsystem(
+                existing_subsystems, "queue_rabbitmq", "RabbitMQ Broker", "data", "queue", "RabbitMQ"
+            )
+            connections.append(SubsystemConnection(src=sub_id, dst=rabbit_sub.id, label="Pub/Sub Events", style="dotted"))
+
+    return subsystems, connections
+
+
 def _scan_python_graph(
     root: Path,
     graph: Graph | None,
@@ -635,6 +782,8 @@ def _scan_python_graph(
     # Group nodes by feature; ignore test suites for production architecture
     features: dict[str, list[Node]] = {}
     for n in nodes:
+        if n.attrs.get("java"):
+            continue
         f = n.feature or "core"
         if f.lower() in {"tests", "test", "testing"}:
             continue
@@ -647,9 +796,15 @@ def _scan_python_graph(
     for finding in graph.findings:
         f_name = None
         if finding.node_id and finding.node_id in node_by_id:
-            f_name = node_by_id[finding.node_id].feature
+            node = node_by_id[finding.node_id]
+            if node.attrs.get("java"):
+                continue
+            f_name = node.feature
         elif finding.evidence:
-            f_name = finding.evidence[0].path.split("/")[0]
+            evidence_path = finding.evidence[0].path
+            if evidence_path.endswith((".java", ".properties", ".xml", ".gradle", ".kts")):
+                continue
+            f_name = evidence_path.split("/")[0]
         if f_name and f_name.lower() not in {"tests", "test", "testing"}:
             if f_name not in findings_by_feature:
                 findings_by_feature[f_name] = []
@@ -818,7 +973,16 @@ def build_high_level_architecture(root: Path, graph: Graph | None = None) -> Hig
         for s in node_subs:
             frameworks.add(s.technology.split(" • ")[0])
 
-    # 4. Inspect Python
+    # 4. Inspect Java / Spring Boot Projects
+    java_subs, java_conns = _scan_java(root, all_subsystems)
+    if java_subs:
+        languages.add("Java")
+        all_subsystems.extend(java_subs)
+        all_connections.extend(java_conns)
+        for s in java_subs:
+            frameworks.add(s.technology)
+
+    # 5. Inspect Python
     py_subs, py_conns = _scan_python_graph(root, graph, all_subsystems)
     if py_subs:
         languages.add("Python")

@@ -3,21 +3,21 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: secdiagram:latest
+    image: secdiagram:local
     container_name: secdiagram
     volumes:
       # Mount current workspace/repository into the container
       - .:/repo
     environment:
-      - GITDIAGRAM_LLM_BASE_URL=http://ollama:11434/v1
-      - GITDIAGRAM_LLM_TIMEOUT=600
+      - SECDIAGRAM_LLM_BASE_URL=http://ollama:11434/v1
+      - SECDIAGRAM_LLM_TIMEOUT=600
     depends_on:
       - ollama
     networks:
       - secdiagram-net
 
   ollama:
-    image: ollama/ollama:latest
+    image: ollama/ollama:0.40.14@sha256:ebaef4f4c5d93660e1f25f8ad085a112f51ccfb0e8458073e71793959dba91c9
     container_name: secdiagram-ollama
     ports:
       - "11434:11434"

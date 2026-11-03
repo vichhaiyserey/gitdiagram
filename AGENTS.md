@@ -27,6 +27,7 @@ Agents must **NEVER** violate these 6 cardinal rules:
 - **Action**: Never add any third-party package to `dependencies = []` in `pyproject.toml`.
 - **Allowed Exception**: Tooling required purely for developer workflows (such as `ruff`, `mypy`, `bandit`, `pip-audit`, `coverage`) belongs exclusively in `[project.optional-dependencies] dev`.
 - **Runtime implementation**: Use standard library modules (`ast`, `urllib`, `dataclasses`, `hashlib`, `json`, `pathlib`, `re`, `shutil`, `tempfile`, `subprocess`).
+- **Supply-chain pinning**: All non-runtime tooling must be exact-pinned (`==`) in `pyproject.toml`; CI must pin pip/build tool versions; GitHub Actions must use full commit SHAs with version comments; container and Compose images must use exact tags plus `@sha256:` digests; npm dependencies must be installed from the committed `docker/mermaid/package-lock.json` via `npm ci`. Never use `latest`, version ranges, or floating action tags.
 
 ### Rule 2: Strict Determinism
 - **Constraint**: The exact same codebase analyzed multiple times must produce byte-for-byte identical output (`diagram.mmd`, `diagram-highlevel.mmd`, `graph.json`, `security.sarif`, `ARCHITECTURE.md`).
@@ -74,6 +75,7 @@ When implementing fixes or enhancements, modify only the relevant modules:
 |---|---|---|
 | [`secdiagram_core/discover.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/discover.py) | Repository enumeration, `.gitignore` parsing, polyglot manifest detection | `discover_repo()`, `RepoContext` |
 | [`secdiagram_core/ast_index.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/ast_index.py) | Python AST parsing for definitions, routes, calls, tasks, type annotations | `index_repo()`, `FileIndex`, `DefRec`, `CallRec` |
+| [`secdiagram_core/java_index.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/java_index.py) | Stdlib-only Java/Spring lexical indexer, DI/call graph edges, and Java SAST heuristics | `index_java()`, `build_java_graph()`, `analyze_java_security()` |
 | [`secdiagram_core/resolver.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/resolver.py) | Qualified symbol resolution, star-import handling, re-exports | `Resolver`, `Resolution` |
 | [`secdiagram_core/graph_builder.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/graph_builder.py) | Assembly of dependency graph, node pruning, edge deduplication | `GraphBuilder`, `BuildStats` |
 | [`secdiagram_core/high_level.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/high_level.py) | C4 subsystem compiler, tiering (Ingress, Gateway, Services, Data, External) | `build_high_level_architecture()`, `render_mermaid_highlevel()` |
@@ -82,6 +84,7 @@ When implementing fixes or enhancements, modify only the relevant modules:
 | [`secdiagram_core/render_mermaid.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_mermaid.py) | Detailed Mermaid diagram generation, node shape styling | `render_mermaid()` |
 | [`secdiagram_core/render_image.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_image.py) | PNG/SVG/PDF rendering via local `mmdc`, Kroki, or mermaid.ink | `render_image()`, `ImageRenderError` |
 | [`secdiagram_core/render_sarif.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_sarif.py) | OASIS SARIF v2.1.0 security report generation | `render_sarif()` |
+| [`secdiagram_core/baseline.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/baseline.py) | Security baseline: load/write/deterministically suppress known findings | `load_baseline()`, `write_baseline()`, `apply_baseline()` |
 | [`secdiagram_core/render_markdown.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_markdown.py) | Markdown architecture report with citations | `render_markdown()` |
 | [`secdiagram_core/render_json.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_json.py) | Full structured graph JSON serializer | `render_json()` |
 | [`secdiagram_core/llm.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/llm.py) | Structured prompt templates & streaming/request handling for Ollama/OpenAI | `generate_narrative()`, `NarrativeError` |

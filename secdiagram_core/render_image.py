@@ -123,7 +123,7 @@ def render_kroki(
 
     base = (
         endpoint
-        or os.environ.get("GITDIAGRAM_IMAGE_ENDPOINT")
+        or os.environ.get("SECDIAGRAM_IMAGE_ENDPOINT")
         or os.environ.get("KROKI_ENDPOINT")
         or "https://kroki.io"
     ).rstrip("/")
@@ -178,7 +178,7 @@ def render_mermaid_ink(
 
     base = (
         endpoint
-        or os.environ.get("GITDIAGRAM_IMAGE_ENDPOINT")
+        or os.environ.get("SECDIAGRAM_IMAGE_ENDPOINT")
         or "https://mermaid.ink"
     ).rstrip("/")
     url = f"{base}/{path_type}/pako:{encoded}"
@@ -235,9 +235,9 @@ def render_image(
             f"Unsupported image format: {image_format}. Must be one of: png, svg, pdf"
         )
 
-    is_offline = offline or os.environ.get("GITDIAGRAM_OFFLINE", "").strip().lower() in {"1", "true", "yes"}
+    is_offline = offline or os.environ.get("SECDIAGRAM_OFFLINE", "").strip().lower() in {"1", "true", "yes"}
 
-    env_provider = os.environ.get("GITDIAGRAM_IMAGE_PROVIDER", "").strip().lower()
+    env_provider = os.environ.get("SECDIAGRAM_IMAGE_PROVIDER", "").strip().lower()
     chosen_provider = env_provider or provider.lower()
 
     if is_offline and chosen_provider in {"kroki", "mermaid.ink"}:

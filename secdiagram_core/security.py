@@ -289,15 +289,67 @@ class SecurityAnalyzer:
             for assign in index.assigns:
                 self.assigns[assign.scope].append(assign)
         self.taint: dict[str, set[str]] = defaultdict(set)
+        self.trace: dict[tuple[str, str], list[Loc]] = {}
         self.findings: list[Finding] = []
         self._seen_findings: set[str] = set()
+
+    # ------------------------------------------------------------ provenance
+    def _trim_trace(self, trace: list[Loc]) -> list[Loc]:
+        seen: set[tuple[str, int, int]] = set()
+        out: list[Loc] = []
+        for loc in trace:
+            key = (loc.path, loc.line, loc.col)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(loc)
+            if len(out) >= 12:
+                break
+        return out
+
+    def _mark_tainted(self, scope: str, name: str, trace: list[Loc]) -> bool:
+        if name in self.taint[scope]:
+            return False
+        self.taint[scope].add(name)
+        trimmed = self._trim_trace(trace)
+        if trimmed:
+            self.trace[(scope, name)] = trimmed
+        return True
+
+    def _variable_trace(self, scope: str, name: str) -> list[Loc]:
+        return list(self.trace.get((scope, name), []))
+
+    def _arg_trace(self, scope: str, call: CallRec, position: int) -> list[Loc]:
+        names = call.arg_names_by_position[position] if position < len(call.arg_names_by_position) else []
+        for name in sorted(set(names)):
+            if name in self.taint.get(scope, set()):
+                trace = self._variable_trace(scope, name)
+                if trace:
+                    return trace
+        index = self.scope_index.get(scope)
+        if position < len(call.arg_texts) and _source_in_text(call.arg_texts[position]) and index:
+            return [Loc(index.path, call.line)]
+        return []
+
+    def _text_trace(self, scope: str, text: str, line: int) -> list[Loc]:
+        for name in sorted(set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text))):
+            if name in self.taint.get(scope, set()):
+                trace = self._variable_trace(scope, name)
+                if trace:
+                    return trace
+        index = self.scope_index.get(scope)
+        if index and _source_in_text(text):
+            return [Loc(index.path, line)]
+        return []
 
     # ------------------------------------------------------------------ taint
     def _initial_taint(self) -> None:
         for definition in self.defs.values():
             if definition.kind in {"endpoint", "task", "cli"}:
-                self.taint[definition.qualname].update(definition.positional_args)
-                self.taint[definition.qualname].add("request")
+                origin = Loc(definition.path, definition.line)
+                for name in definition.positional_args:
+                    self._mark_tainted(definition.qualname, name, [origin])
+                self._mark_tainted(definition.qualname, "request", [origin])
             if definition.kind == "endpoint":
                 node = self.graph.find_node_by_qualname(definition.qualname)
                 if node is not None:
@@ -313,27 +365,31 @@ class SecurityAnalyzer:
             for scope, calls in self.calls.items():
                 assigns = self.assigns.get(scope, [])
                 local = self.taint[scope]
+                index = self.scope_index.get(scope)
                 for assign in assigns:
                     targets = [target.strip() for target in assign.target.split(",") if target.strip().isidentifier()]
                     if not targets:
                         continue
+                    here = [Loc(index.path, assign.line)] if index and assign.line else []
                     if assign.value_callee and _source_call(assign.value_callee):
                         for target in targets:
-                            if target not in local:
-                                local.add(target)
-                                changed = True
+                            changed |= self._mark_tainted(scope, target, here)
                     if any(name in local for name in assign.value_names):
+                        base: list[Loc] = []
+                        for name in sorted(set(assign.value_names)):
+                            if name in local:
+                                trace = self._variable_trace(scope, name)
+                                if trace:
+                                    base = trace
+                                    break
                         for target in targets:
-                            if target not in local:
-                                local.add(target)
-                                changed = True
+                            changed |= self._mark_tainted(scope, target, base + here)
                 for call in calls:
+                    here = [Loc(index.path, call.line)] if index else []
                     if call.assigned_to and _source_call(call.callee):
                         for target in call.assigned_to:
-                            if target.isidentifier() and target not in local:
-                                local.add(target)
-                                changed = True
-                    index = self.scope_index.get(scope)
+                            if target.isidentifier():
+                                changed |= self._mark_tainted(scope, target, here)
                     if index is None:
                         continue
                     for resolution in self.resolver.resolve_callee(index, call):
@@ -348,17 +404,15 @@ class SecurityAnalyzer:
                         for position in tainted_args:
                             if position < len(target_def.positional_args):
                                 name = target_def.positional_args[position]
-                                if name not in self.taint[target_def.qualname]:
-                                    self.taint[target_def.qualname].add(name)
-                                    changed = True
+                                trace = self._arg_trace(scope, call, position) + here
+                                changed |= self._mark_tainted(target_def.qualname, name, trace)
                         for keyword, text in call.keywords.items():
                             if keyword in target_def.positional_args and (
                                 any(name in local for name in re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text))
                                 or _source_in_text(text)
                             ):
-                                if keyword not in self.taint[target_def.qualname]:
-                                    self.taint[target_def.qualname].add(keyword)
-                                    changed = True
+                                trace = self._text_trace(scope, text, call.line) + here
+                                changed |= self._mark_tainted(target_def.qualname, keyword, trace)
             if not changed:
                 break
 
@@ -385,6 +439,7 @@ class SecurityAnalyzer:
         node_id: str | None,
         confidence: float,
         recommendation: str,
+        trace: list[Loc] | None = None,
     ) -> None:
         key = f"{category}:{loc.path}:{loc.line}:{title}"
         if key in self._seen_findings:
@@ -402,6 +457,7 @@ class SecurityAnalyzer:
                 confidence=confidence,
                 evidence=[loc],
                 recommendation=recommendation,
+                trace=list(trace or []),
             )
         )
 
@@ -429,6 +485,13 @@ class SecurityAnalyzer:
         callee = call.callee
         tainted_args = self._tainted_arg_positions(call, local)
         tainted = bool(tainted_args) or any(_source_in_text(text) for text in call.arg_texts)
+        trace: list[Loc] = []
+        if tainted_args:
+            trace = self._arg_trace(scope, call, sorted(tainted_args)[0])
+        elif any(_source_in_text(text) for text in call.arg_texts):
+            trace = [loc]
+        if trace:
+            trace = self._trim_trace(trace + [loc])
         dynamic = call.has_fstring or any(".format(" in text for text in call.arg_texts) or not self._is_literal(call)
 
         if _source_call(callee):
@@ -471,6 +534,7 @@ class SecurityAnalyzer:
                 node_id=node_id,
                 confidence=0.95 if tainted else 0.75,
                 recommendation=rule.remediation,
+                trace=trace if tainted else None,
             )
 
         if "subprocess" in callee and call.keywords.get("shell", "").lower() == "true":
@@ -488,6 +552,7 @@ class SecurityAnalyzer:
                 node_id=node_id,
                 confidence=0.95,
                 recommendation="Avoid shell=True; pass an argv list and validate inputs.",
+                trace=trace if tainted else None,
             )
 
         if call.keywords.get("verify", "").lower() == "false" and any(

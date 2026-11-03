@@ -10,9 +10,9 @@ RUN npm install -g @mermaid-js/mermaid-cli@11.4.2 \
 FROM python:3.12-slim
 
 # Labels following OCI specifications
-LABEL org.opencontainers.image.title="gitdiagram" \
+LABEL org.opencontainers.image.title="secdiagram" \
       org.opencontainers.image.description="Deterministic architecture, relationship, and security diagrams for Python repositories." \
-      org.opencontainers.image.authors="gitdiagram maintainers" \
+      org.opencontainers.image.authors="secdiagram maintainers" \
       org.opencontainers.image.licenses="MIT"
 
 # Install git, ca-certificates, and system Chromium for offline diagram rendering
@@ -41,22 +41,22 @@ ENV PUPPETEER_CONFIG=/etc/puppeteer-config.json \
     MERMAID_CONFIG=/etc/mermaid-config.json
 
 # Create non-root user for container security
-RUN useradd -u 10001 -m -s /bin/bash gitdiagram \
+RUN useradd -u 10001 -m -s /bin/bash secdiagram \
     && mkdir -p /repo /app \
-    && chown -R gitdiagram:gitdiagram /app /repo
+    && chown -R secdiagram:secdiagram /app /repo
 
 WORKDIR /app
 
 # Copy application source code
 COPY . /app
 
-# Install gitdiagram package
+# Install secdiagram package
 RUN pip install --no-cache-dir .
 
 # Switch to non-root user and target volume
-USER gitdiagram
+USER secdiagram
 WORKDIR /repo
 VOLUME ["/repo"]
 
-ENTRYPOINT ["gitdiagram"]
+ENTRYPOINT ["secdiagram"]
 CMD ["--dir", "."]

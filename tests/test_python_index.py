@@ -8,10 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gitdiagram_core.ast_index import index_repo
-from gitdiagram_core.discover import discover
-from gitdiagram_core.frameworks import annotate
-from gitdiagram_core.resolver import Resolver
+from secdiagram_core.ast_index import index_repo
+from secdiagram_core.discover import discover
+from secdiagram_core.frameworks import annotate
+from secdiagram_core.resolver import Resolver
 
 try:
     from .support import FIXTURE
@@ -109,7 +109,7 @@ class AstAndResolverTests(unittest.TestCase):
     def test_augmented_assignment_indexing(self) -> None:
         import tempfile
 
-        from gitdiagram_core.ast_index import index_file
+        from secdiagram_core.ast_index import index_file
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
             file_path = tmp_root / "example.py"
@@ -122,7 +122,7 @@ class AstAndResolverTests(unittest.TestCase):
     def test_star_import_resolution(self) -> None:
         import tempfile
 
-        from gitdiagram_core.ast_index import index_repo
+        from secdiagram_core.ast_index import index_repo
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
             (tmp_root / "helpers.py").write_text("def helper_fn():\n    return 42\n", encoding="utf-8")
@@ -139,7 +139,7 @@ class AstAndResolverTests(unittest.TestCase):
     def test_package_reexport_resolution(self) -> None:
         import tempfile
 
-        from gitdiagram_core.ast_index import index_repo
+        from secdiagram_core.ast_index import index_repo
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
             pkg_dir = tmp_root / "mypkg"

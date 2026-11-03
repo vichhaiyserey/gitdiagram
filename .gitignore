@@ -45,9 +45,9 @@ env.bak/
 venv.bak/
 
 # ==============================================================================
-# gitdiagram generated artifacts & analysis outputs
+# secdiagram generated artifacts & analysis outputs
 # ==============================================================================
-.gitdiagram/
+.secdiagram/
 test_docker_out/
 diagram_out/
 artifacts/

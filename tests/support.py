@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gitdiagram_core.analyzer import AnalysisConfig, AnalysisResult, run_analysis
+from secdiagram_core.analyzer import AnalysisConfig, AnalysisResult, run_analysis
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "sample_app"
 

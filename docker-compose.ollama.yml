@@ -6,8 +6,8 @@
 # 2. Pull Qwen (e.g. qwen2.5-coder):
 #    docker exec -it ollama ollama pull qwen2.5-coder
 #
-# 3. Run gitdiagram with Ollama:
-#    python gitdiagram.py --dir . --ollama qwen2.5-coder
+# 3. Run secdiagram with Ollama:
+#    python secdiagram.py --dir . --ollama qwen2.5-coder
 #
 services:
   ollama:

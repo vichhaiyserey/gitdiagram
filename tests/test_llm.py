@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gitdiagram_core.llm import NarrativeError, _compact, generate_narrative
+from secdiagram_core.llm import NarrativeError, _compact, generate_narrative
 
 try:
     from .support import fixture_result

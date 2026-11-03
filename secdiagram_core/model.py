@@ -14,7 +14,7 @@ SEVERITY_RANK = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
 
 def stable_id(*parts: str) -> str:
     """Return a deterministic, collision-resistant identifier."""
-    digest = hashlib.sha1("\x1f".join(parts).encode("utf-8"), usedforsecurity=False).hexdigest()
+    digest = hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()
     return digest[:12]
 
 
@@ -235,7 +235,7 @@ class Graph:
             "schema_version": SCHEMA_VERSION,
             "meta": {
                 **self.meta,
-                "tool": "gitdiagram",
+                "tool": "secdiagram",
                 "tool_version": __version__,
                 "node_count": len(self.nodes),
                 "edge_count": len(self.edges),

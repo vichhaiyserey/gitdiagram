@@ -12,7 +12,7 @@ SKIP_DIRS = {
     ".git",
     ".hg",
     ".svn",
-    ".gitdiagram",
+    ".secdiagram",
     "__pycache__",
     ".mypy_cache",
     ".pytest_cache",

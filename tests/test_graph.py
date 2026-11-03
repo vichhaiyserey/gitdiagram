@@ -8,8 +8,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gitdiagram_core.analyzer import AnalysisConfig, run_analysis
-from gitdiagram_core.model import Loc, Node, stable_id
+from secdiagram_core.analyzer import AnalysisConfig, run_analysis
+from secdiagram_core.model import Loc, Node, stable_id
 
 try:
     from .support import FIXTURE, fixture_result
@@ -97,7 +97,7 @@ class GraphTests(unittest.TestCase):
         self.assertTrue(endpoint_nodes, "Highest priority endpoints should be retained during pruning")
 
     def test_edge_deduplication(self) -> None:
-        from gitdiagram_core.model import Graph
+        from secdiagram_core.model import Graph
         g = Graph()
         n1 = Node(id="1", kind="function", name="a", qualname="mod.a")
         n2 = Node(id="2", kind="function", name="b", qualname="mod.b")

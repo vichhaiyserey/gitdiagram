@@ -3,14 +3,14 @@ requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gitdiagram"
+name = "secdiagram"
 version = "0.1.0"
 description = "Deterministic architecture, relationship, and security diagrams for Python repositories."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
-    { name = "gitdiagram maintainers" }
+    { name = "secdiagram maintainers" }
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -27,8 +27,8 @@ classifiers = [
 ]
 
 [project.scripts]
-gitdiagram = "gitdiagram_core.cli:main"
-gitdiagram-image = "gitdiagram_core.render_image:main"
+secdiagram = "secdiagram_core.cli:main"
+secdiagram-image = "secdiagram_core.render_image:main"
 
 [project.optional-dependencies]
 dev = [
@@ -41,7 +41,7 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["gitdiagram_core*"]
+include = ["secdiagram_core*"]
 
 [tool.ruff]
 target-version = "py310"
@@ -52,17 +52,17 @@ extend-exclude = [".venv", "tests/fixtures"]
 select = ["E4", "E7", "E9", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.per-file-ignores]
-"gitdiagram_core/__init__.py" = ["E402"]
+"secdiagram_core/__init__.py" = ["E402"]
 "tests/**" = ["E402"]
 
 [tool.mypy]
 python_version = "3.10"
-files = ["gitdiagram_core"]
+files = ["secdiagram_core"]
 ignore_missing_imports = true
 warn_unused_ignores = true
 
 [tool.coverage.run]
-source = ["gitdiagram_core"]
+source = ["secdiagram_core"]
 
 [tool.coverage.report]
 show_missing = true

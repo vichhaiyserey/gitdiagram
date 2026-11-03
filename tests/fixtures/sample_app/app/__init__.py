@@ -1,4 +1,4 @@
-"""Sample application used by gitdiagram tests."""
+"""Sample application used by secdiagram tests."""
 
 from .main import app
 

@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gitdiagram_core.cli import main
+from secdiagram_core.cli import main
 
 try:
     from .support import FIXTURE
@@ -92,7 +92,7 @@ class CliTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "out"
             fake_narrative = "# Qwen Architecture\nAnalyzed with Qwen 2.5."
-            with mock.patch("gitdiagram_core.cli.generate_narrative", return_value=fake_narrative) as mock_gen:
+            with mock.patch("secdiagram_core.cli.generate_narrative", return_value=fake_narrative) as mock_gen:
                 code, _, _ = self._run(
                     ["--dir", str(FIXTURE), "--out", str(out), "--ollama", "qwen2.5-coder", "--quiet"]
                 )
@@ -111,7 +111,7 @@ class CliTests(unittest.TestCase):
                 proc = subprocess.run(
                     [
                         sys.executable,
-                        str(ROOT / "gitdiagram.py"),
+                        str(ROOT / "secdiagram.py"),
                         "--dir",
                         str(FIXTURE),
                         "--out",
@@ -172,7 +172,7 @@ class CliTests(unittest.TestCase):
                 output_path.write_bytes(dummy_png)
                 return output_path
 
-            with mock.patch("gitdiagram_core.cli.render_image", side_effect=fake_render_image):
+            with mock.patch("secdiagram_core.cli.render_image", side_effect=fake_render_image):
                 code, stdout, _ = self._run(
                     ["--dir", str(FIXTURE), "--out", str(out), "--image"]
                 )
@@ -191,7 +191,7 @@ class CliTests(unittest.TestCase):
                 output_path.write_bytes(dummy_svg)
                 return output_path
 
-            with mock.patch("gitdiagram_core.cli.render_image", side_effect=fake_render_image):
+            with mock.patch("secdiagram_core.cli.render_image", side_effect=fake_render_image):
                 code, stdout, _ = self._run(
                     ["--dir", str(FIXTURE), "--out", str(out), "--image", "svg", "--quiet"]
                 )
@@ -208,7 +208,7 @@ class CliTests(unittest.TestCase):
                 output_path.write_bytes(dummy_png)
                 return output_path
 
-            with mock.patch("gitdiagram_core.cli.render_image", side_effect=fake_render_image):
+            with mock.patch("secdiagram_core.cli.render_image", side_effect=fake_render_image):
                 code, _, _ = self._run(
                     ["--dir", str(FIXTURE), "--out", str(out), "--format", "png", "--quiet"]
                 )
@@ -217,12 +217,12 @@ class CliTests(unittest.TestCase):
             self.assertFalse((out / "graph.json").exists())
 
     def test_image_render_error_returns_exit_1(self) -> None:
-        from gitdiagram_core.render_image import ImageRenderError
+        from secdiagram_core.render_image import ImageRenderError
 
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "out"
             with mock.patch(
-                "gitdiagram_core.cli.render_image",
+                "secdiagram_core.cli.render_image",
                 side_effect=ImageRenderError("Network unreachable"),
             ):
                 code, _, stderr = self._run(
@@ -232,7 +232,7 @@ class CliTests(unittest.TestCase):
             self.assertIn("could not write output: Network unreachable", stderr)
 
     def test_normalize_cli_path_git_bash(self) -> None:
-        from gitdiagram_core.cli import _normalize_cli_path
+        from secdiagram_core.cli import _normalize_cli_path
 
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -248,7 +248,7 @@ class CliTests(unittest.TestCase):
     def test_llm_timeout_cli_arg(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             out = Path(tmp) / "out"
-            with mock.patch("gitdiagram_core.cli.generate_narrative", return_value="# Mock Narrative") as mock_gen:
+            with mock.patch("secdiagram_core.cli.generate_narrative", return_value="# Mock Narrative") as mock_gen:
                 code, _, _ = self._run(
                     ["--dir", str(FIXTURE), "--out", str(out), "--llm", "--llm-timeout", "450", "--quiet"]
                 )

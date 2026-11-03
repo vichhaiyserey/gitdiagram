@@ -1,6 +1,6 @@
 # AGENTS.md — AI Agent Operating Manual & Safety Guardrails
 
-This document establishes the mandatory operational boundaries, architectural constraints, and verification protocols for autonomous AI coding assistants (such as Antigravity, Claude, Copilot, Cursor, and Windsurf) working within the `gitdiagram` repository.
+This document establishes the mandatory operational boundaries, architectural constraints, and verification protocols for autonomous AI coding assistants (such as Antigravity, Claude, Copilot, Cursor, and Windsurf) working within the `secdiagram` repository.
 
 All AI agents operating on this codebase **MUST** read, understand, and adhere to these guidelines.
 
@@ -8,8 +8,8 @@ All AI agents operating on this codebase **MUST** read, understand, and adhere t
 
 ## 🎯 1. Core Mission & Philosophy
 
-`gitdiagram` is a lightweight, high-performance, deterministic static analysis engine that generates:
-- **Human-friendly system architecture diagrams** (`gitdiagram.com` and C4 style) in Mermaid, PNG, SVG, and PDF.
+`secdiagram` is a lightweight, high-performance, deterministic static analysis engine that generates:
+- **Human-friendly system architecture diagrams** (`secdiagram.com` and C4 style) in Mermaid, PNG, SVG, and PDF.
 - **Detailed architectural relationship graphs** (modules, classes, methods, endpoints, database schemas, queues).
 - **SAST security overlays & threat models** citing exact `path:line` references, exportable to OASIS SARIF v2.1.0.
 - **Evidence-grounded AI architectural narratives** via local Ollama or OpenAI endpoints without hallucinations.
@@ -20,10 +20,10 @@ The guiding motto is: ***Small but Gold*** — minimal footprint, zero runtime b
 
 ## ⛔ 2. Absolute Non-Negotiable Constraints
 
-Agents must **NEVER** violate these 5 cardinal rules:
+Agents must **NEVER** violate these 6 cardinal rules:
 
 ### Rule 1: Zero External Runtime Dependencies
-- **Constraint**: `gitdiagram`'s core package **must remain 100% standard library**.
+- **Constraint**: `secdiagram`'s core package **must remain 100% standard library**.
 - **Action**: Never add any third-party package to `dependencies = []` in `pyproject.toml`.
 - **Allowed Exception**: Tooling required purely for developer workflows (such as `ruff`, `mypy`, `bandit`, `pip-audit`, `coverage`) belongs exclusively in `[project.optional-dependencies] dev`.
 - **Runtime implementation**: Use standard library modules (`ast`, `urllib`, `dataclasses`, `hashlib`, `json`, `pathlib`, `re`, `shutil`, `tempfile`, `subprocess`).
@@ -32,11 +32,11 @@ Agents must **NEVER** violate these 5 cardinal rules:
 - **Constraint**: The exact same codebase analyzed multiple times must produce byte-for-byte identical output (`diagram.mmd`, `diagram-highlevel.mmd`, `graph.json`, `security.sarif`, `ARCHITECTURE.md`).
 - **Action**:
   - Never iterate over unordered `set` or dictionary keys when writing diagram elements, markdown, or JSON.
-  - Always use `stable_id(*parts)` from `gitdiagram_core.model` to generate IDs.
+  - Always use `stable_id(*parts)` from `secdiagram_core.model` to generate IDs.
   - Sort lists and keys deterministically before output serialization.
 
 ### Rule 3: Zero Code Execution on Analyzed Repositories
-- **Constraint**: `gitdiagram` is designed to analyze potentially untrusted third-party repositories.
+- **Constraint**: `secdiagram` is designed to analyze potentially untrusted third-party repositories.
 - **Action**:
   - **NEVER** use `eval()`, `exec()`, `compile()`, or `importlib.import_module()` to inspect code.
   - All source analysis must be performed strictly via AST parsing (`ast.parse`) and static regex/manifest parsing.
@@ -56,6 +56,14 @@ Agents must **NEVER** violate these 5 cardinal rules:
   - Never edit or bypass `.gitignore` or `.dockerignore` to force-track ignored or sensitive files.
   - Run a secret pattern scan before committing.
 
+### Rule 6: Strictly No Direct Push to `main` — Always Use Feature Branches
+- **Constraint**: Autonomous AI agents must **NEVER** push commits directly to the `main` (or `master`) branch.
+- **Action**:
+  - Never run `git push origin main` or attempt to push directly to `main`.
+  - Always check out a dedicated, descriptively named feature or bugfix branch (e.g. `feature/...`, `feat/...`, `fix/...`, `ci/...`) before committing or pushing.
+  - Push changes exclusively to the feature branch: `git push -u origin <branch-name>`.
+  - Open a Pull Request (PR) against `main` for CI validation and human review.
+
 ---
 
 ## 🗺️ 3. Repository Architecture Map
@@ -64,21 +72,21 @@ When implementing fixes or enhancements, modify only the relevant modules:
 
 | Module | Responsibility | Key Interfaces / Functions |
 |---|---|---|
-| [`gitdiagram_core/discover.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/discover.py) | Repository enumeration, `.gitignore` parsing, polyglot manifest detection | `discover_repo()`, `RepoContext` |
-| [`gitdiagram_core/ast_index.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/ast_index.py) | Python AST parsing for definitions, routes, calls, tasks, type annotations | `index_repo()`, `FileIndex`, `DefRec`, `CallRec` |
-| [`gitdiagram_core/resolver.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/resolver.py) | Qualified symbol resolution, star-import handling, re-exports | `Resolver`, `Resolution` |
-| [`gitdiagram_core/graph_builder.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/graph_builder.py) | Assembly of dependency graph, node pruning, edge deduplication | `GraphBuilder`, `BuildStats` |
-| [`gitdiagram_core/high_level.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/high_level.py) | C4 subsystem compiler, tiering (Ingress, Gateway, Services, Data, External) | `build_high_level_architecture()`, `render_mermaid_highlevel()` |
-| [`gitdiagram_core/security.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/security.py) | SAST heuristics: taint tracking, SQLi, command injection, secret patterns | `analyze()`, `Finding` |
-| [`gitdiagram_core/iac.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/iac.py) | Infrastructure-as-Code audits: Dockerfile, Compose, K8s, Terraform | `analyze_iac()`, `IacResult` |
-| [`gitdiagram_core/render_mermaid.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/render_mermaid.py) | Detailed Mermaid diagram generation, node shape styling | `render_mermaid()` |
-| [`gitdiagram_core/render_image.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/render_image.py) | PNG/SVG/PDF rendering via local `mmdc`, Kroki, or mermaid.ink | `render_image()`, `ImageRenderError` |
-| [`gitdiagram_core/render_sarif.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/render_sarif.py) | OASIS SARIF v2.1.0 security report generation | `render_sarif()` |
-| [`gitdiagram_core/render_markdown.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/render_markdown.py) | Markdown architecture report with citations | `render_markdown()` |
-| [`gitdiagram_core/render_json.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/render_json.py) | Full structured graph JSON serializer | `render_json()` |
-| [`gitdiagram_core/llm.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/llm.py) | Structured prompt templates & streaming/request handling for Ollama/OpenAI | `generate_narrative()`, `NarrativeError` |
-| [`gitdiagram_core/cli.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/cli.py) | CLI argument parser, pipeline orchestration, exit codes | `main()`, `build_parser()` |
-| [`gitdiagram_core/model.py`](file:///C:/Users/Lenovo/projects/clone-gitdiagram/gitdiagram_core/model.py) | Data models: `Graph`, `Node`, `Edge`, `Finding`, `Loc`, `stable_id` | `stable_id()`, `SEVERITY_RANK` |
+| [`secdiagram_core/discover.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/discover.py) | Repository enumeration, `.gitignore` parsing, polyglot manifest detection | `discover_repo()`, `RepoContext` |
+| [`secdiagram_core/ast_index.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/ast_index.py) | Python AST parsing for definitions, routes, calls, tasks, type annotations | `index_repo()`, `FileIndex`, `DefRec`, `CallRec` |
+| [`secdiagram_core/resolver.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/resolver.py) | Qualified symbol resolution, star-import handling, re-exports | `Resolver`, `Resolution` |
+| [`secdiagram_core/graph_builder.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/graph_builder.py) | Assembly of dependency graph, node pruning, edge deduplication | `GraphBuilder`, `BuildStats` |
+| [`secdiagram_core/high_level.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/high_level.py) | C4 subsystem compiler, tiering (Ingress, Gateway, Services, Data, External) | `build_high_level_architecture()`, `render_mermaid_highlevel()` |
+| [`secdiagram_core/security.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/security.py) | SAST heuristics: taint tracking, SQLi, command injection, secret patterns | `analyze()`, `Finding` |
+| [`secdiagram_core/iac.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/iac.py) | Infrastructure-as-Code audits: Dockerfile, Compose, K8s, Terraform | `analyze_iac()`, `IacResult` |
+| [`secdiagram_core/render_mermaid.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_mermaid.py) | Detailed Mermaid diagram generation, node shape styling | `render_mermaid()` |
+| [`secdiagram_core/render_image.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_image.py) | PNG/SVG/PDF rendering via local `mmdc`, Kroki, or mermaid.ink | `render_image()`, `ImageRenderError` |
+| [`secdiagram_core/render_sarif.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_sarif.py) | OASIS SARIF v2.1.0 security report generation | `render_sarif()` |
+| [`secdiagram_core/render_markdown.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_markdown.py) | Markdown architecture report with citations | `render_markdown()` |
+| [`secdiagram_core/render_json.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_json.py) | Full structured graph JSON serializer | `render_json()` |
+| [`secdiagram_core/llm.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/llm.py) | Structured prompt templates & streaming/request handling for Ollama/OpenAI | `generate_narrative()`, `NarrativeError` |
+| [`secdiagram_core/cli.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/cli.py) | CLI argument parser, pipeline orchestration, exit codes | `main()`, `build_parser()` |
+| [`secdiagram_core/model.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/model.py) | Data models: `Graph`, `Node`, `Edge`, `Finding`, `Loc`, `stable_id` | `stable_id()`, `SEVERITY_RANK` |
 
 ---
 
@@ -105,7 +113,7 @@ mypy
 
 ### Step 3: Run Static Application Security Testing (SAST)
 ```bash
-python -m bandit -r gitdiagram_core -lll
+python -m bandit -r secdiagram_core -lll
 ```
 - **Requirement**: Zero high/critical severity findings.
 
@@ -153,17 +161,35 @@ git diff
 
 ---
 
-## 📝 6. Commit & Message Conventions for Agents
+## 📝 6. Branching, Commit & Pull Request Conventions for Agents
 
-When committing changes on behalf of the user, AI agents must:
+When creating branches, committing changes, or pushing on behalf of the user, AI agents must:
 
-1. **Follow Conventional Commits**:
+1. **Branching Protocol (Strictly No Direct Push to `main`)**:
+   - **NEVER** run `git push origin main` or attempt to push directly to `main` (or `master`).
+   - Check the active branch with `git branch --show-current`. If currently on `main`, immediately check out a dedicated feature branch before committing or pushing:
+     ```bash
+     git checkout -b <prefix>/<descriptive-name>
+     ```
+   - Standard branch naming prefixes:
+     - `feat/<feature-name>` for new capabilities or analyzers.
+     - `fix/<bug-or-alert-name>` for bug fixes or security remediations.
+     - `ci/<workflow-name>` for CI/CD workflow updates.
+     - `docs/<doc-update>` for documentation updates.
+     - `refactor/<module-name>` for refactoring without functional changes.
+   - Always push strictly to the feature branch:
+     ```bash
+     git push -u origin <branch-name>
+     ```
+   - Notify the user of the pushed branch name so they can review and open a Pull Request.
+
+2. **Follow Conventional Commits**:
    - `feat:` for new capabilities or analyzers.
    - `fix:` for bug fixes.
    - `ci:` for CI/CD workflow updates.
    - `docs:` for documentation updates.
    - `test:` for test additions or refactoring.
    - `refactor:` for code restructuring without behavioral change.
-2. **Provide a Meaningful Multi-Line Description**:
+3. **Provide a Meaningful Multi-Line Description**:
    Summarize the specific technical changes, impacted modules, and test results.
-3. **Never include AI internal metadata or conversational artifacts** inside commit messages.
+4. **Never include AI internal metadata or conversational artifacts** inside commit messages.

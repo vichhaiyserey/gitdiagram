@@ -1,4 +1,4 @@
-"""Command-line interface for gitdiagram."""
+"""Command-line interface for secdiagram."""
 
 from __future__ import annotations
 
@@ -12,13 +12,14 @@ from .analyzer import AnalysisConfig, run_analysis
 from .high_level import build_high_level_architecture, render_mermaid_highlevel
 from .llm import NarrativeError, generate_narrative
 from .model import SEVERITY_RANK
+from .render_html import render_html
 from .render_image import ImageRenderError, render_image
 from .render_json import render_json
 from .render_markdown import render_markdown
 from .render_mermaid import render_mermaid
 from .render_sarif import render_sarif
 
-FORMATS = {"json", "md", "mermaid", "sarif", "png", "svg", "pdf", "image"}
+FORMATS = {"json", "md", "mermaid", "sarif", "png", "svg", "pdf", "image", "html"}
 
 
 def _parse_formats(value: str) -> list[str]:
@@ -29,6 +30,8 @@ def _parse_formats(value: str) -> list[str]:
             item = "md"
         elif item in {"img", "picture"}:
             item = "image"
+        elif item in {"web", "report"}:
+            item = "html"
         if item and item not in FORMATS:
             raise argparse.ArgumentTypeError(f"unknown format: {item}")
         if item and item not in formats:
@@ -40,20 +43,20 @@ def _parse_formats(value: str) -> list[str]:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="gitdiagram",
+        prog="secdiagram",
         description="Build deterministic architecture, relationship, and security diagrams for a Python repository.",
     )
     parser.add_argument("--dir", default=".", help="repository directory to analyze (default: .)")
     parser.add_argument(
         "--out",
         default=None,
-        help="output directory (default: <dir>/.gitdiagram)",
+        help="output directory (default: <dir>/.secdiagram)",
     )
     parser.add_argument(
         "--format",
         default="json,md,mermaid",
         type=_parse_formats,
-        help="comma-separated outputs: json, md, mermaid, sarif, png, svg, pdf (default: json,md,mermaid)",
+        help="comma-separated outputs: json, md, mermaid, sarif, html, png, svg, pdf (default: json,md,mermaid)",
     )
     parser.add_argument("--include", action="append", default=[], metavar="GLOB", help="include path glob")
     parser.add_argument("--exclude", action="append", default=[], metavar="GLOB", help="exclude path glob")
@@ -174,6 +177,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="strictly offline mode: forbids external HTTP diagram rendering and requires local tools",
     )
     parser.add_argument(
+        "--mermaid-js",
+        default=None,
+        metavar="PATH",
+        help="inline a local mermaid.min.js bundle into the HTML report for fully offline diagram rendering",
+    )
+    parser.add_argument(
         "--diagram-detail",
         choices=["architecture", "full", "high-level", "overview"],
         default="architecture",
@@ -210,7 +219,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="exit with code 2 when a finding at or above this severity exists",
     )
     parser.add_argument("--quiet", action="store_true", help="suppress the summary")
-    parser.add_argument("--version", action="version", version=f"gitdiagram {__version__}")
+    parser.add_argument("--version", action="version", version=f"secdiagram {__version__}")
     return parser
 
 
@@ -249,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     root = _normalize_cli_path(args.dir)
-    out = _normalize_cli_path(args.out) if args.out else root / ".gitdiagram"
+    out = _normalize_cli_path(args.out) if args.out else root / ".secdiagram"
 
     try:
         result = run_analysis(
@@ -263,10 +272,10 @@ def main(argv: list[str] | None = None) -> int:
             )
         )
     except (FileNotFoundError, NotADirectoryError) as exc:
-        print(f"gitdiagram: {exc}", file=sys.stderr)
+        print(f"secdiagram: {exc}", file=sys.stderr)
         return 1
     except Exception as exc:  # pragma: no cover - defensive top-level guard
-        print(f"gitdiagram: analysis failed: {exc}", file=sys.stderr)
+        print(f"secdiagram: analysis failed: {exc}", file=sys.stderr)
         return 1
 
     graph = result.graph
@@ -291,6 +300,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     mermaid_text: str | None = None
+    narrative_text: str | None = None
 
     try:
         if "json" in args.format:
@@ -386,7 +396,7 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.llm:
             try:
-                narrative = generate_narrative(
+                narrative_text = generate_narrative(
                     graph,
                     model=llm_model,
                     base_url=args.llm_base_url,
@@ -397,13 +407,53 @@ def main(argv: list[str] | None = None) -> int:
                     max_tokens=args.llm_max_tokens,
                 )
             except NarrativeError as exc:
-                print(f"gitdiagram: {exc}", file=sys.stderr)
+                print(f"secdiagram: {exc}", file=sys.stderr)
                 return 1
             path = out / "NARRATIVE.md"
-            path.write_text(narrative, encoding="utf-8", newline="\n")
+            path.write_text(narrative_text, encoding="utf-8", newline="\n")
+            written.append(path)
+
+        if "html" in args.format:
+            mermaid_js_text: str | None = None
+            if args.mermaid_js:
+                bundle = _normalize_cli_path(args.mermaid_js)
+                try:
+                    mermaid_js_text = bundle.read_text(encoding="utf-8")
+                except OSError as exc:
+                    print(f"secdiagram: could not read mermaid bundle: {exc}", file=sys.stderr)
+                    return 1
+            if args.diagram_detail in {"high-level", "overview"}:
+                report_detail = highlevel_mermaid
+            else:
+                if mermaid_text is None:
+                    mermaid_text = render_mermaid(
+                        graph,
+                        link_base=args.link_base,
+                        detail=args.diagram_detail,
+                        direction=args.diagram_direction,
+                        theme=args.diagram_theme,
+                        max_diagram_nodes=args.max_diagram_nodes,
+                    )
+                report_detail = mermaid_text
+            path = out / "report.html"
+            path.write_text(
+                render_html(
+                    graph,
+                    meta=meta,
+                    hla=hla,
+                    highlevel_mermaid=highlevel_mermaid,
+                    detail_mermaid=report_detail,
+                    narrative=narrative_text,
+                    root=root,
+                    mermaid_js=mermaid_js_text,
+                    offline=args.offline,
+                ),
+                encoding="utf-8",
+                newline="\n",
+            )
             written.append(path)
     except (OSError, ImageRenderError) as exc:
-        print(f"gitdiagram: could not write output: {exc}", file=sys.stderr)
+        print(f"secdiagram: could not write output: {exc}", file=sys.stderr)
         return 1
 
     if not args.quiet:
@@ -418,14 +468,14 @@ def main(argv: list[str] | None = None) -> int:
             polyglot_bits.append(f"frameworks: {', '.join(sorted(hla.frameworks))}")
         polyglot_info = f" [{'; '.join(polyglot_bits)}]" if polyglot_bits else ""
         print(
-            f"gitdiagram: {result.python_files} Python files, {len(graph.nodes)} nodes, "
+            f"secdiagram: {result.python_files} Python files, {len(graph.nodes)} nodes, "
             f"{len(graph.edges)} edges, {len(graph.features)} features, {len(hla.subsystems)} subsystems, "
             f"{len(graph.findings)} findings"
             + (f" ({severity_text})" if severity_text else "")
             + polyglot_info
         )
         if result.parse_errors:
-            print(f"gitdiagram: skipped {len(result.parse_errors)} file(s) with parse errors", file=sys.stderr)
+            print(f"secdiagram: skipped {len(result.parse_errors)} file(s) with parse errors", file=sys.stderr)
         for path in written:
             print(f"  wrote {path}")
 

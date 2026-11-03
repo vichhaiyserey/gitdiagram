@@ -11,9 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gitdiagram_core.analyzer import AnalysisConfig, run_analysis
-from gitdiagram_core.cli import main
-from gitdiagram_core.high_level import (
+from secdiagram_core.analyzer import AnalysisConfig, run_analysis
+from secdiagram_core.cli import main
+from secdiagram_core.high_level import (
     build_high_level_architecture,
     render_mermaid_highlevel,
 )
@@ -60,7 +60,7 @@ class HighLevelArchitectureTests(unittest.TestCase):
         hla = build_high_level_architecture(SAMPLE_DOTNET_DIR)
 
         self.assertIn("C# / .NET", hla.languages)
-        self.assertTrue(any(".NET" in f or "ASP.NET" in f for f in hla.frameworks))
+        self.assertTrue(bool({".NET", "ASP.NET Core Web API"} & set(hla.frameworks)))
 
         subsystem_names = {s.name for s in hla.subsystems}
         self.assertIn("Clients / Frontends", subsystem_names)

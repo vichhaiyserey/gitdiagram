@@ -1,6 +1,6 @@
-# Contributing to gitdiagram
+# Contributing to secdiagram
 
-Thank you for your interest in contributing to **gitdiagram**! We welcome contributions from developers, security researchers, and software architects of all backgrounds.
+Thank you for your interest in contributing to **secdiagram**! We welcome contributions from developers, security researchers, and software architects of all backgrounds.
 
 This guide outlines our development workflow, architectural principles, coding standards, and security policies to help you contribute effectively and safely.
 
@@ -31,12 +31,12 @@ This guide outlines our development workflow, architectural principles, coding s
 
 ## 🏛️ Architectural Principles
 
-Before writing code, please keep the four core tenets of `gitdiagram` in mind:
+Before writing code, please keep the four core tenets of `secdiagram` in mind:
 
 1. **Zero External Runtime Dependencies**: The core CLI, AST analyzer, graph builder, and renderers must run on the **Python standard library only**. We do not add third-party runtime wheels to `dependencies = []` in `pyproject.toml`. This eliminates supply chain risk and ensures instant installation.
 2. **Deterministic Output**: Analyzing the same repository state must always yield identical outputs (`diagram.mmd`, `graph.json`, `security.sarif`, etc.). IDs are computed via deterministic hashing (`stable_id`). Never iterate over unordered sets or dict keys when writing outputs.
 3. **100% Offline-First**: All core analysis, diagram generation, and security checks must run without internet access. Any remote feature (e.g. Kroki, mermaid.ink, OpenAI API) must be strictly optional with graceful local fallbacks.
-4. **Security by Design**: `gitdiagram` inspects untrusted repositories. It must never execute (`eval`, `exec`, `importlib`) analyzed code. All file reading, path resolutions, and YAML/JSON parses must be hardened against path traversal and deserialization attacks.
+4. **Security by Design**: `secdiagram` inspects untrusted repositories. It must never execute (`eval`, `exec`, `importlib`) analyzed code. All file reading, path resolutions, and YAML/JSON parses must be hardened against path traversal and deserialization attacks.
 
 ---
 
@@ -59,8 +59,8 @@ We are committed to providing a friendly, safe, and welcoming environment for al
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/vserey/gitdiagram.git
-   cd clone-gitdiagram
+   git clone https://github.com/vserey/secdiagram.git
+   cd clone-secdiagram
    ```
 
 2. **Create and activate a virtual environment**:
@@ -107,7 +107,7 @@ python -m coverage run -m unittest discover -s tests
 python -m coverage report
 ```
 
-> **Note**: Test suite must achieve **≥ 80% coverage** across `gitdiagram_core`. All existing 97+ tests must pass without regressions.
+> **Note**: Test suite must achieve **≥ 80% coverage** across `secdiagram_core`. All existing 97+ tests must pass without regressions.
 
 ### Linting and Formatting
 
@@ -135,10 +135,10 @@ Run automated security gates before pushing commits:
 
 ```bash
 # Run Bandit SAST gate (high severity)
-python -m bandit -r gitdiagram_core -lll
+python -m bandit -r secdiagram_core -lll
 
 # Generate full Bandit JSON report
-python -m bandit -r gitdiagram_core -f json -o bandit.json
+python -m bandit -r secdiagram_core -f json -o bandit.json
 
 # Check installed dev dependencies for vulnerabilities
 python -m pip_audit --strict --skip-editable
@@ -149,8 +149,8 @@ python -m pip_audit --strict --skip-editable
 ## 📂 Codebase Architecture
 
 ```text
-gitdiagram/
-├── gitdiagram_core/             # Core library (Zero external runtime dependencies)
+secdiagram/
+├── secdiagram_core/             # Core library (Zero external runtime dependencies)
 │   ├── __init__.py              # Version, schema, and public exports
 │   ├── analyzer.py              # Orchestrates repo discovery, AST indexing, and analysis
 │   ├── ast_index.py             # Python AST parser (classes, functions, calls, imports)
@@ -243,7 +243,7 @@ gitdiagram/
    - Ensure all tests pass: `python -m unittest discover -s tests -v`.
    - Ensure linter passes: `ruff check .`.
    - Ensure type check passes: `mypy`.
-   - Ensure security scan passes: `python -m bandit -r gitdiagram_core -lll`.
+   - Ensure security scan passes: `python -m bandit -r secdiagram_core -lll`.
 
 3. **Verify Git Hygiene**:
    - Verify no secrets, `.env` files, temporary screenshots, or dump files are staged:
@@ -285,11 +285,11 @@ feat: add detection for Go modules and Gin route endpoints
 
 ## 🛡️ Reporting Security Vulnerabilities
 
-We take security seriously. If you discover a security vulnerability in `gitdiagram`, **please do not disclose it publicly in an issue or forum**.
+We take security seriously. If you discover a security vulnerability in `secdiagram`, **please do not disclose it publicly in an issue or forum**.
 
 Instead, please report it privately:
 
-1. **GitHub Security Advisory**: Submit a report via [GitHub Private Vulnerability Reporting](https://github.com/vserey/gitdiagram/security/advisories/new).
+1. **GitHub Security Advisory**: Submit a report via [GitHub Private Vulnerability Reporting](https://github.com/vserey/secdiagram/security/advisories/new).
 2. **Email**: If you are unable to use GitHub Security Advisories, send an encrypted email to the maintainer at `vichhaiyserey@gmail.com`.
 
 Include:

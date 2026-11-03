@@ -9,10 +9,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gitdiagram_core.render_json import render_json
-from gitdiagram_core.render_markdown import render_markdown
-from gitdiagram_core.render_mermaid import render_mermaid
-from gitdiagram_core.render_sarif import render_sarif
+from secdiagram_core.render_json import render_json
+from secdiagram_core.render_markdown import render_markdown
+from secdiagram_core.render_mermaid import render_mermaid
+from secdiagram_core.render_sarif import render_sarif
 
 try:
     from .support import fixture_result

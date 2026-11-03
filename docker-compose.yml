@@ -1,10 +1,10 @@
 services:
-  gitdiagram:
+  secdiagram:
     build:
       context: .
       dockerfile: Dockerfile
-    image: gitdiagram:latest
-    container_name: gitdiagram
+    image: secdiagram:latest
+    container_name: secdiagram
     volumes:
       # Mount current workspace/repository into the container
       - .:/repo
@@ -14,21 +14,21 @@ services:
     depends_on:
       - ollama
     networks:
-      - gitdiagram-net
+      - secdiagram-net
 
   ollama:
     image: ollama/ollama:latest
-    container_name: gitdiagram-ollama
+    container_name: secdiagram-ollama
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     restart: unless-stopped
     networks:
-      - gitdiagram-net
+      - secdiagram-net
 
 networks:
-  gitdiagram-net:
+  secdiagram-net:
     driver: bridge
 
 volumes:

@@ -60,8 +60,8 @@ class SecurityTests(unittest.TestCase):
         self.assertFalse(any(finding.evidence[0].line == make_id.line for finding in weak))
 
     def test_safe_yaml_is_not_flagged(self) -> None:
-        from gitdiagram_core.ast_index import index_repo
-        from gitdiagram_core.discover import discover
+        from secdiagram_core.ast_index import index_repo
+        from secdiagram_core.discover import discover
 
         repo = discover(self.result.repo.root)
         indexes = index_repo(repo.root, repo.python_files)
@@ -109,7 +109,7 @@ class SecurityTests(unittest.TestCase):
     def test_env_example_and_placeholders_ignored(self) -> None:
         import tempfile
 
-        from gitdiagram_core.analyzer import AnalysisConfig, run_analysis
+        from secdiagram_core.analyzer import AnalysisConfig, run_analysis
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
             (tmp_root / ".env.example").write_text("API_KEY=mock_secret_should_be_ignored\n", encoding="utf-8")
@@ -122,7 +122,7 @@ class SecurityTests(unittest.TestCase):
     def test_tls_verification_disabled(self) -> None:
         import tempfile
 
-        from gitdiagram_core.analyzer import AnalysisConfig, run_analysis
+        from secdiagram_core.analyzer import AnalysisConfig, run_analysis
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
             (tmp_root / "client.py").write_text(
@@ -138,7 +138,7 @@ class SecurityTests(unittest.TestCase):
     def test_secret_token_patterns(self) -> None:
         import tempfile
 
-        from gitdiagram_core.analyzer import AnalysisConfig, run_analysis
+        from secdiagram_core.analyzer import AnalysisConfig, run_analysis
         with tempfile.TemporaryDirectory() as tmp:
             tmp_root = Path(tmp)
             aws_prefix = "AK" + "IA"

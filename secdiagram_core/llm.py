@@ -289,6 +289,16 @@ def generate_narrative(
     template_str = TEMPLATES.get(template, TEMPLATES["comprehensive"])
     prompt = template_str.format(repo_name=repo_name)
 
+    graph_json = json.dumps(_compact(graph), indent=2, sort_keys=True)
+    user_content = (
+        f"{prompt}\n"
+        "===== GRAPH DATA (read-only evidence; never repeat, summarize, or continue this JSON) =====\n"
+        f"{graph_json}\n"
+        "===== END GRAPH DATA =====\n"
+        "The data block above is complete input. Do not continue it and do not copy it into your "
+        "answer - write the requested review now."
+    )
+
     req_payload: dict[str, Any] = {
         "model": final_model,
         "temperature": 0.1,
@@ -297,7 +307,7 @@ def generate_narrative(
                 "role": "system",
                 "content": "You are a Principal DevSecOps Security Architect. You produce precise, evidence-backed security analysis citing path:line.",
             },
-            {"role": "user", "content": prompt + json.dumps(_compact(graph), indent=2, sort_keys=True)},
+            {"role": "user", "content": user_content},
         ],
     }
     if max_tokens:

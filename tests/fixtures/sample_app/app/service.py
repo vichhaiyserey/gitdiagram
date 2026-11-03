@@ -30,8 +30,8 @@ def read_file(filename: str) -> str:
         return handle.read()
 
 
-def hash_password(password: str) -> str:
-    return hashlib.md5(password.encode()).hexdigest()
+def hash_password(data: str) -> str:
+    return hashlib.md5(data.encode()).hexdigest()
 
 
 def make_id(parts: list[str]) -> str:

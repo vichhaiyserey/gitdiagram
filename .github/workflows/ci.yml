@@ -88,10 +88,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
       - name: Bandit high-severity gate
-        run: python -m bandit -r gitdiagram_core -lll -f txt
+        run: python -m bandit -r secdiagram_core -lll -f txt
       - name: Bandit full report
         if: always()
-        run: python -m bandit -r gitdiagram_core -f json -o bandit.json
+        run: python -m bandit -r secdiagram_core -f json -o bandit.json
       - name: Upload Bandit report
         if: always()
         uses: actions/upload-artifact@v4

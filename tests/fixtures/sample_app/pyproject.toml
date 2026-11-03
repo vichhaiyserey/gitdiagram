@@ -1,4 +1,4 @@
 [project]
 name = "sample-app"
 version = "0.1.0"
-description = "Fixture used by gitdiagram tests."
+description = "Fixture used by secdiagram tests."

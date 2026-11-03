@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gitdiagram_core.discover import discover
+from secdiagram_core.discover import discover
 
 try:
     from .support import FIXTURE

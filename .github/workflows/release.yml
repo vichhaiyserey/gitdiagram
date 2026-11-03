@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE_NAME: vserey/gitdiagram
+  IMAGE_NAME: vserey/secdiagram
 
 jobs:
   verify:
@@ -118,7 +118,7 @@ jobs:
           platforms: linux/amd64
           push: false
           load: true
-          tags: gitdiagram:release
+          tags: secdiagram:release
           cache-from: type=gha
           cache-to: type=gha,mode=max
       # Report-only: the bundled Node.js/Mermaid CLI layer can carry upstream
@@ -126,7 +126,7 @@ jobs:
       - name: Trivy image scan
         uses: aquasecurity/trivy-action@0.28.0
         with:
-          image-ref: gitdiagram:release
+          image-ref: secdiagram:release
           scanners: vuln,secret
           severity: CRITICAL,HIGH
           format: sarif
@@ -164,7 +164,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
           labels: |
-            org.opencontainers.image.title=gitdiagram
+            org.opencontainers.image.title=secdiagram
             org.opencontainers.image.description=Deterministic architecture, relationship, and security diagrams for Python repositories.
             org.opencontainers.image.licenses=MIT
       - name: Build and push multi-arch image

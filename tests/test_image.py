@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 import urllib.error
+import urllib.parse
 from pathlib import Path
 from unittest import mock
 
@@ -12,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from gitdiagram_core.render_image import (
+from secdiagram_core.render_image import (
     ImageRenderError,
     render_image,
     render_kroki,
@@ -20,7 +21,7 @@ from gitdiagram_core.render_image import (
     render_mermaid_ink,
     sanitize_mermaid,
 )
-from gitdiagram_core.render_image import (
+from secdiagram_core.render_image import (
     main as image_cli_main,
 )
 
@@ -176,10 +177,11 @@ class ImageRenderTests(unittest.TestCase):
             dummy_png = b"\x89PNGfallback"
 
             def mock_urlopen_fn(req, **kwargs):
-                url = req.full_url if hasattr(req, "full_url") else str(req)
-                if "kroki.io" in url:
+                raw_url = req.full_url if hasattr(req, "full_url") else str(req)
+                hostname = urllib.parse.urlsplit(raw_url).hostname or ""
+                if hostname == "kroki.io" or hostname.endswith(".kroki.io"):
                     raise urllib.error.URLError("Kroki down")
-                if "mermaid.ink" in url:
+                if hostname == "mermaid.ink" or hostname.endswith(".mermaid.ink"):
                     mock_resp = mock.MagicMock()
                     mock_resp.read.return_value = dummy_png
                     mock_resp.__enter__.return_value = mock_resp

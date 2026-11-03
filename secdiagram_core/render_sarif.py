@@ -60,9 +60,9 @@ def render_sarif(graph: Graph) -> str:
             {
                 "tool": {
                     "driver": {
-                        "name": "gitdiagram",
+                        "name": "secdiagram",
                         "version": __version__,
-                        "informationUri": "https://github.com/ahmedkhaleel2004/gitdiagram",
+                        "informationUri": "https://github.com/ahmedkhaleel2004/secdiagram",
                         "rules": rules,
                     }
                 },

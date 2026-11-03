@@ -1,4 +1,4 @@
-"""gitdiagram: deterministic architecture and security graphs for Python, .NET, Node.js, and polyglot repositories."""
+"""secdiagram: deterministic architecture and security graphs for Python, .NET, Node.js, and polyglot repositories."""
 
 __version__ = "0.1.0"
 SCHEMA_VERSION = 1

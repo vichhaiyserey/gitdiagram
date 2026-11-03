@@ -131,7 +131,7 @@ def render_kroki(
     data = source.encode("utf-8")
     headers = {
         "Content-Type": "text/plain; charset=utf-8",
-        "User-Agent": "gitdiagram",
+        "User-Agent": "secdiagram",
         "Accept": "image/*, application/*, */*",
     }
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
@@ -183,7 +183,7 @@ def render_mermaid_ink(
     ).rstrip("/")
     url = f"{base}/{path_type}/pako:{encoded}"
     headers = {
-        "User-Agent": "gitdiagram",
+        "User-Agent": "secdiagram",
         "Accept": "image/*, */*",
     }
     req = urllib.request.Request(url, headers=headers)
@@ -306,7 +306,7 @@ def render_image(
 def main(argv: list[str] | None = None) -> int:
     """CLI helper to convert a Mermaid diagram file (.mmd) into an image."""
     parser = argparse.ArgumentParser(
-        prog="gitdiagram-render-image",
+        prog="secdiagram-render-image",
         description="Convert a Mermaid (.mmd) diagram file into an image (PNG, SVG, PDF).",
     )
     parser.add_argument("input", type=Path, help="path to input .mmd file")

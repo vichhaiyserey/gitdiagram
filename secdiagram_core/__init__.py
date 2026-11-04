@@ -3,6 +3,7 @@
 __version__ = "0.1.0"
 SCHEMA_VERSION = 1
 
+from .config import SecdiagramConfig, load_config
 from .high_level import (
     HighLevelArchitecture,
     Subsystem,
@@ -11,6 +12,7 @@ from .high_level import (
     render_mermaid_highlevel,
 )
 from .render_image import ImageRenderError, render_image
+from .server import BasicAuthenticator, NoOpAuthenticator, create_server, serve
 
 __all__ = [
     "__version__",
@@ -22,4 +24,10 @@ __all__ = [
     "SubsystemConnection",
     "build_high_level_architecture",
     "render_mermaid_highlevel",
+    "create_server",
+    "serve",
+    "load_config",
+    "SecdiagramConfig",
+    "BasicAuthenticator",
+    "NoOpAuthenticator",
 ]

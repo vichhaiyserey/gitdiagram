@@ -29,6 +29,7 @@ classifiers = [
 [project.scripts]
 secdiagram = "secdiagram_core.cli:main"
 secdiagram-image = "secdiagram_core.render_image:main"
+secdiagram-server = "secdiagram_core.cli:server_main"
 
 [project.optional-dependencies]
 dev = [

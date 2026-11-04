@@ -238,6 +238,48 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="write security.baseline.json from the current scan (path from --baseline, default <out>/security.baseline.json)",
     )
+    parser.add_argument(
+        "--serve",
+        action="store_true",
+        help="launch the interactive platform HTTP server and REST API daemon",
+    )
+    parser.add_argument(
+        "--server-port",
+        type=int,
+        default=None,
+        metavar="PORT",
+        help="port for the platform HTTP server (default: 8080)",
+    )
+    parser.add_argument(
+        "--server-host",
+        default=None,
+        metavar="HOST",
+        help="host binding for the platform server (default: 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--server-user",
+        default=None,
+        metavar="USER",
+        help="username for platform HTTP Basic Authentication",
+    )
+    parser.add_argument(
+        "--server-pass",
+        default=None,
+        metavar="PASS",
+        help="password for platform HTTP Basic Authentication",
+    )
+    parser.add_argument(
+        "--server-read-only",
+        action="store_true",
+        default=False,
+        help="disallow re-scans via the platform REST API",
+    )
+    parser.add_argument(
+        "--config",
+        default=None,
+        metavar="FILE",
+        help="path to secdiagram configuration JSON file",
+    )
     parser.add_argument("--quiet", action="store_true", help="suppress the summary")
     parser.add_argument("--version", action="version", version=f"secdiagram {__version__}")
     return parser
@@ -274,10 +316,57 @@ def _normalize_cli_path(path_str: str) -> Path:
     return p
 
 
+def server_main(argv: list[str] | None = None) -> int:
+    """Dedicated entrypoint for secdiagram-server."""
+    parser = argparse.ArgumentParser(
+        prog="secdiagram-server",
+        description="Run the secdiagram platform HTTP server and REST API daemon.",
+    )
+    parser.add_argument("--dir", default=".", help="repository directory to serve (default: .)")
+    parser.add_argument("--host", default=None, help="host binding (default: 127.0.0.1)")
+    parser.add_argument("--port", type=int, default=None, help="port (default: 8080)")
+    parser.add_argument("--user", default=None, help="HTTP Basic Auth username")
+    parser.add_argument("--password", default=None, help="HTTP Basic Auth password")
+    parser.add_argument("--read-only", action="store_true", default=False, help="disallow API-triggered scans")
+    parser.add_argument("--config", default=None, help="configuration file path")
+    args = parser.parse_args(argv)
+    from .server import serve
+    root = _normalize_cli_path(args.dir)
+    cfg_path = _normalize_cli_path(args.config) if args.config else None
+    return serve(
+        root=root,
+        host=args.host,
+        port=args.port,
+        auth_username=args.user,
+        auth_password=args.password,
+        read_only=args.read_only,
+        config_path=cfg_path,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
+    if argv is None:
+        argv = sys.argv[1:]
+    if argv and argv[0] == "serve":
+        return server_main(argv[1:])
+
     parser = build_parser()
     args = parser.parse_args(argv)
     root = _normalize_cli_path(args.dir)
+
+    if args.serve:
+        from .server import serve
+        cfg_path = _normalize_cli_path(args.config) if args.config else None
+        return serve(
+            root=root,
+            host=args.server_host,
+            port=args.server_port,
+            auth_username=args.server_user,
+            auth_password=args.server_pass,
+            read_only=args.server_read_only,
+            config_path=cfg_path,
+        )
+
     out = _normalize_cli_path(args.out) if args.out else root / ".secdiagram"
 
     try:

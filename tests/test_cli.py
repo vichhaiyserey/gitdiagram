@@ -285,6 +285,29 @@ class CliTests(unittest.TestCase):
                 mock_gen.assert_called_once()
                 self.assertEqual(mock_gen.call_args.kwargs.get("timeout"), 450.0)
 
+    def test_cli_serve_dispatches_to_server(self) -> None:
+        from secdiagram_core.cli import main, server_main
+        with mock.patch("secdiagram_core.server.serve", return_value=0) as mock_serve:
+            code = main(["serve", "--port", "9999", "--user", "testuser", "--password", "testpass"])
+            self.assertEqual(code, 0)
+            mock_serve.assert_called_once()
+            self.assertEqual(mock_serve.call_args.kwargs.get("port"), 9999)
+            self.assertEqual(mock_serve.call_args.kwargs.get("auth_username"), "testuser")
+            self.assertEqual(mock_serve.call_args.kwargs.get("auth_password"), "testpass")
+
+        with mock.patch("secdiagram_core.server.serve", return_value=0) as mock_serve2:
+            code2 = main(["--dir", str(FIXTURE), "--serve", "--server-port", "7777"])
+            self.assertEqual(code2, 0)
+            mock_serve2.assert_called_once()
+            self.assertEqual(mock_serve2.call_args.kwargs.get("port"), 7777)
+
+        with mock.patch("secdiagram_core.server.serve", return_value=0) as mock_serve3:
+            code3 = server_main(["--dir", str(FIXTURE), "--port", "8888", "--read-only"])
+            self.assertEqual(code3, 0)
+            mock_serve3.assert_called_once()
+            self.assertEqual(mock_serve3.call_args.kwargs.get("port"), 8888)
+            self.assertTrue(mock_serve3.call_args.kwargs.get("read_only"))
+
 
 if __name__ == "__main__":
     unittest.main()

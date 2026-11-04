@@ -24,6 +24,7 @@ This guide outlines our development workflow, architectural principles, coding s
   - [Modern Python Typing (3.10+)](#4-modern-python-typing-310)
   - [Security Best Practices](#5-security-best-practices)
   - [Dependency Pinning & Supply Chain](#6-dependency-pinning--supply-chain)
+- [Branching Model](#branching-model)
 - [Pull Request Process](#-pull-request-process)
 - [Commit Message Conventions](#-commit-message-conventions)
 - [Reporting Security Vulnerabilities](#-reporting-security-vulnerabilities)
@@ -108,7 +109,7 @@ python -m coverage run -m unittest discover -s tests
 python -m coverage report
 ```
 
-> **Note**: Test suite must achieve **≥ 80% coverage** across `secdiagram_core`. All existing 97+ tests must pass without regressions.
+> **Note**: Test suite must achieve **≥ 80% coverage** across `secdiagram_core`. All existing 134+ tests must pass without regressions.
 
 ### Linting and Formatting
 
@@ -237,10 +238,31 @@ secdiagram/
 
 ---
 
+## Branching Model
+
+| Branch | Purpose | Direct commits | Promotion |
+|---|---|---|---|
+| `main` | Stable, release-ready | Never | `develop` → `main` via release PR |
+| `develop` | Integration | Never | Feature branches merged locally |
+| `feat/...`, `fix/...`, `ci/...`, `docs/...` | Short-lived work | Yes | PR or local merge into `develop` |
+
+- Branch from `develop` and keep it current with `origin/develop` before starting.
+- `develop` must always contain the latest `main`.
+- Merge features into `develop` locally only after the full verification suite passes; push `develop` after a clean merge.
+- Promote `develop` to `main` only when a release is ready and all CI gates pass.
+- Tag releases on `main` after the release merge is verified.
+- After a release, sync `main` back into `develop`; the `develop-sync.yml` workflow does this automatically and fails loudly on conflicts.
+- Never force-push `main`, `develop`, or any shared branch.
+
+---
+
 ## 🤝 Pull Request Process
 
-1. **Fork and branch**: Create a branch with a descriptive name:
+1. **Fork and branch from `develop`**:
    ```bash
+   git fetch origin
+   git checkout develop
+   git merge --ff-only origin/develop
    git checkout -b feat/add-go-manifest-detection
    # or
    git checkout -b fix/sanitize-mermaid-subgraph-ids
@@ -261,11 +283,13 @@ secdiagram/
      git diff --cached
      ```
 
-4. **Submit PR**: Open a Pull Request targeting the `main` branch. Provide a clear description of:
+4. **Submit PR**: Open a Pull Request targeting the `develop` branch. Provide a clear description of:
    - What the PR accomplishes.
    - Why the change is needed.
    - Relevant issue numbers.
    - Test results.
+
+5. **Release promotion**: Maintainers merge `develop` into `main` via a release Pull Request only when the release is ready, then tag the verified commit on `main`.
 
 ---
 

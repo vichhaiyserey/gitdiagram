@@ -57,13 +57,15 @@ Agents must **NEVER** violate these 6 cardinal rules:
   - Never edit or bypass `.gitignore` or `.dockerignore` to force-track ignored or sensitive files.
   - Run a secret pattern scan before committing.
 
-### Rule 6: Strictly No Direct Push to `main` — Always Use Feature Branches
-- **Constraint**: Autonomous AI agents must **NEVER** push commits directly to the `main` (or `master`) branch.
+### Rule 6: Promote Through `develop` — `main` Is Release-Only
+- **Constraint**: `main` is the stable, release-ready branch. Autonomous AI agents must **NEVER** push direct commits to `main` (or `master`) or `develop`, and must **NEVER** merge a feature branch directly into `main`.
 - **Action**:
-  - Never run `git push origin main` or attempt to push directly to `main`.
-  - Always check out a dedicated, descriptively named feature or bugfix branch (e.g. `feature/...`, `feat/...`, `fix/...`, `ci/...`) before committing or pushing.
-  - Push changes exclusively to the feature branch: `git push -u origin <branch-name>`.
-  - Open a Pull Request (PR) against `main` for CI validation and human review.
+  - Treat `develop` as the integration branch and keep it current with `main`.
+  - Create feature branches from `develop`, push them to `origin`, and merge them into `develop` locally after verification.
+  - Push `develop` only as the result of a clean local feature-branch merge or the automated `develop-sync.yml` main sync.
+  - Open Pull Requests against `develop` for CI validation and human review.
+  - Merge `develop` into `main` only when a release is ready; release tags belong on `main`.
+  - After a release, sync `main` back into `develop` (the `develop-sync.yml` workflow automates this and fails loudly on conflicts).
 
 ---
 
@@ -101,7 +103,7 @@ Before declaring any coding task complete or committing changes, AI agents **MUS
 ```bash
 python -m unittest discover -s tests -v
 ```
-- **Requirement**: All 97+ tests must pass with exit code `0`.
+- **Requirement**: All 134+ tests must pass with exit code `0`.
 - If new functionality was added, corresponding unit tests must be added in `tests/test_*.py`.
 
 ### Step 2: Verify Code Quality & Type Safety
@@ -168,31 +170,57 @@ git diff
 
 When creating branches, committing changes, or pushing on behalf of the user, AI agents must:
 
-1. **Branching Protocol (Strictly No Direct Push to `main`)**:
-   - **NEVER** run `git push origin main` or attempt to push directly to `main` (or `master`).
-   - Check the active branch with `git branch --show-current`. If currently on `main`, immediately check out a dedicated feature branch before committing or pushing:
-     ```bash
-     git checkout -b <prefix>/<descriptive-name>
-     ```
+1. **Branch Roles & Promotion (Feature → `develop` → `main`)**:
+   - `main` is the stable, release-ready branch. It receives only release merges from `develop` via Pull Request.
+   - `develop` is the integration branch. It must always contain the latest `main` and all verified feature merges.
+   - Feature branches are short-lived and branch from `develop` (use `main` only for an urgent hotfix).
+   - **NEVER** commit directly to `main` or `develop`, and **NEVER** merge a feature branch directly into `main`.
+   - Check the active branch with `git branch --show-current` before committing.
    - Standard branch naming prefixes:
      - `feat/<feature-name>` for new capabilities or analyzers.
      - `fix/<bug-or-alert-name>` for bug fixes or security remediations.
      - `ci/<workflow-name>` for CI/CD workflow updates.
      - `docs/<doc-update>` for documentation updates.
      - `refactor/<module-name>` for refactoring without functional changes.
-   - Always push strictly to the feature branch:
-     ```bash
-     git push -u origin <branch-name>
-     ```
-   - Notify the user of the pushed branch name so they can review and open a Pull Request.
 
-2. **Follow Conventional Commits**:
+2. **Feature Development and Local Merge into `develop`**:
+   ```bash
+   git fetch origin
+   git checkout develop
+   git merge --ff-only origin/develop
+   git checkout -b <prefix>/<descriptive-name>
+   # implement, test, and commit
+   git push -u origin <prefix>/<descriptive-name>
+   ```
+   - Before merging, update the feature branch from the latest `develop` and run the full verification suite.
+   - Merge locally with a merge commit, resolve any conflicts on the feature branch, and never commit conflict markers:
+     ```bash
+     git fetch origin
+     git checkout develop
+     git merge --ff-only origin/develop
+     git merge --no-ff <prefix>/<descriptive-name>
+     python -m unittest discover -s tests -v
+     python -m ruff check .
+     mypy
+     python -m bandit -r secdiagram_core -lll
+     git push origin develop
+     ```
+   - Open a Pull Request targeting `develop` when human review is required.
+   - Never force-push `main`, `develop`, or any shared branch.
+
+3. **Release Promotion (`develop` → `main`)**:
+   - Merge `develop` into `main` only when the release is ready and all CI gates pass.
+   - Use a Pull Request from `develop` to `main`; do not push directly to `main`.
+   - Tag releases on `main` only after the release merge is verified. Tagging is a human release action; agents must not create or push tags unless explicitly instructed.
+   - Immediately sync `main` back into `develop` after a release so `develop` remains the latest integration branch.
+
+4. **Follow Conventional Commits**:
    - `feat:` for new capabilities or analyzers.
    - `fix:` for bug fixes.
    - `ci:` for CI/CD workflow updates.
    - `docs:` for documentation updates.
    - `test:` for test additions or refactoring.
    - `refactor:` for code restructuring without behavioral change.
-3. **Provide a Meaningful Multi-Line Description**:
+5. **Provide a Meaningful Multi-Line Description**:
    Summarize the specific technical changes, impacted modules, and test results.
-4. **Never include AI internal metadata or conversational artifacts** inside commit messages.
+6. **Never include AI internal metadata or conversational artifacts** inside commit messages.

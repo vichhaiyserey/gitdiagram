@@ -39,8 +39,11 @@ jobs:
             echo "develop already contains main"
             exit 0
           fi
-          git merge --no-edit origin/main
+          git merge --no-ff -m "chore: sync develop with main" origin/main
           python -m pip install "pip==${PIP_VERSION}"
           python -m pip install -e ".[dev]"
           python -m unittest discover -s tests
+          python -m ruff check .
+          python -m mypy
+          python -m bandit -r secdiagram_core -lll
           git push origin HEAD:develop

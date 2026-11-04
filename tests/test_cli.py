@@ -45,6 +45,35 @@ class CliTests(unittest.TestCase):
             self.assertIn("wrote", stdout)
             payload = json.loads((out / "graph.json").read_text(encoding="utf-8"))
             self.assertGreater(payload["meta"]["finding_count"], 0)
+            self.assertIn("files_discovered", payload["meta"])
+            self.assertIn("config_hash", payload["meta"])
+            self.assertIn("languages", payload["meta"])
+            self.assertIn("python", payload["meta"]["languages"])
+
+    def test_min_finding_confidence_filters_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            unfiltered = Path(tmp) / "unfiltered"
+            filtered = Path(tmp) / "filtered"
+            self._run(["--dir", str(FIXTURE), "--out", str(unfiltered), "--format", "json", "--quiet"])
+            self._run(
+                [
+                    "--dir",
+                    str(FIXTURE),
+                    "--out",
+                    str(filtered),
+                    "--format",
+                    "json",
+                    "--min-finding-confidence",
+                    "0.9",
+                    "--quiet",
+                ]
+            )
+            everything = json.loads((unfiltered / "graph.json").read_text(encoding="utf-8"))
+            survivors = json.loads((filtered / "graph.json").read_text(encoding="utf-8"))
+            self.assertLess(len(survivors["findings"]), len(everything["findings"]))
+            self.assertTrue(survivors["findings"])
+            self.assertTrue(all(item["confidence"] >= 0.9 for item in survivors["findings"]))
+            self.assertEqual(survivors["meta"]["finding_confidence_floor"], 0.9)
 
     def test_fail_on_critical(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -71,7 +100,7 @@ class CliTests(unittest.TestCase):
 
     def test_llm_without_key_fails_cleanly(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            env = {key: value for key, value in os.environ.items() if key not in {"OPENAI_API_KEY", "GITDIAGRAM_LLM_API_KEY"}}
+            env = {key: value for key, value in os.environ.items() if key not in {"OPENAI_API_KEY", "SECDIAGRAM_LLM_API_KEY"}}
             with mock.patch.dict(os.environ, env, clear=True):
                 code, _, stderr = self._run(
                     [
@@ -255,6 +284,29 @@ class CliTests(unittest.TestCase):
                 self.assertEqual(code, 0)
                 mock_gen.assert_called_once()
                 self.assertEqual(mock_gen.call_args.kwargs.get("timeout"), 450.0)
+
+    def test_cli_serve_dispatches_to_server(self) -> None:
+        from secdiagram_core.cli import main, server_main
+        with mock.patch("secdiagram_core.server.serve", return_value=0) as mock_serve:
+            code = main(["serve", "--port", "9999", "--user", "testuser", "--password", "testpass"])
+            self.assertEqual(code, 0)
+            mock_serve.assert_called_once()
+            self.assertEqual(mock_serve.call_args.kwargs.get("port"), 9999)
+            self.assertEqual(mock_serve.call_args.kwargs.get("auth_username"), "testuser")
+            self.assertEqual(mock_serve.call_args.kwargs.get("auth_password"), "testpass")
+
+        with mock.patch("secdiagram_core.server.serve", return_value=0) as mock_serve2:
+            code2 = main(["--dir", str(FIXTURE), "--serve", "--server-port", "7777"])
+            self.assertEqual(code2, 0)
+            mock_serve2.assert_called_once()
+            self.assertEqual(mock_serve2.call_args.kwargs.get("port"), 7777)
+
+        with mock.patch("secdiagram_core.server.serve", return_value=0) as mock_serve3:
+            code3 = server_main(["--dir", str(FIXTURE), "--port", "8888", "--read-only"])
+            self.assertEqual(code3, 0)
+            mock_serve3.assert_called_once()
+            self.assertEqual(mock_serve3.call_args.kwargs.get("port"), 8888)
+            self.assertTrue(mock_serve3.call_args.kwargs.get("read_only"))
 
 
 if __name__ == "__main__":

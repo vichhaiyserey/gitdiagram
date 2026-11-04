@@ -104,6 +104,14 @@ def render_markdown(
         f"**{len(graph.nodes)}** nodes | **{len(graph.edges)}** edges | "
         f"**{len(graph.features)}** features | **{len(graph.findings)}** security findings"
     )
+    baseline_info = meta.get("security_baseline") or {}
+    if baseline_info:
+        lines.append("")
+        lines.append(
+            f"Baseline `{baseline_info.get('file', 'security.baseline.json')}` suppresses "
+            f"**{baseline_info.get('known', 0)}** known finding(s); findings below and in "
+            f"`security.sarif` cover the **{baseline_info.get('new', 0)}** new one(s) only."
+        )
     lines.append("")
 
     if high_level_mermaid:
@@ -126,6 +134,8 @@ def render_markdown(
     lines.append("|---|---:|---:|---:|---:|---:|")
     findings_by_feature: dict[str, int] = defaultdict(int)
     for finding in graph.findings:
+        if finding.baseline:
+            continue
         node = node_by_id.get(finding.node_id or "")
         if node and node.feature:
             findings_by_feature[node.feature] += 1
@@ -235,27 +245,62 @@ def render_markdown(
         lines.append("")
 
     if graph.findings:
-        lines.append("## Security review")
-        lines.append("")
-        lines.append(
-            "These are evidence-backed review prompts, not confirmed vulnerabilities. "
-            "Tainted findings rise to critical; risky patterns without taint remain review items."
-        )
-        lines.append("")
-        lines.append("| Severity | Category | CWE | Evidence | Finding | Recommendation |")
-        lines.append("|---|---|---|---|---|---|")
-        for finding in graph.sorted_findings():
-            ref = f"`{finding.evidence[0].ref}`" if finding.evidence else "-"
+        new_findings = [finding for finding in graph.sorted_findings() if not finding.baseline]
+        if baseline_info and not new_findings:
+            lines.append("## Security review")
+            lines.append("")
             lines.append(
-                f"| **{_esc(finding.severity)}** | {_esc(finding.category)} | "
-                f"{_esc(finding.cwe or '-')} | {ref} | {_esc(finding.title)} | "
-                f"{_esc(finding.recommendation)} |"
+                f"All findings are covered by the baseline (`{baseline_info.get('file', 'security.baseline.json')}`); "
+                "nothing new to review. Regenerate the baseline with `--create-baseline` after triaging."
             )
-        lines.append("")
+            lines.append("")
+        elif new_findings:
+            lines.append("## Security review")
+            lines.append("")
+            lines.append(
+                "These are evidence-backed review prompts, not confirmed vulnerabilities. "
+                "Tainted findings rise to critical; risky patterns without taint remain review items."
+            )
+            lines.append("")
+            lines.append("| Severity | Category | CWE | Evidence | Taint path | Finding | Recommendation |")
+            lines.append("|---|---|---|---|---|---|---|")
+            for finding in new_findings:
+                ref = f"`{finding.evidence[0].ref}`" if finding.evidence else "-"
+                trace = " -> ".join(f"`{_esc(loc.ref)}`" for loc in finding.trace) if finding.trace else "-"
+                lines.append(
+                    f"| **{_esc(finding.severity)}** | {_esc(finding.category)} | "
+                    f"{_esc(finding.cwe or '-')} | {ref} | {trace} | {_esc(finding.title)} | "
+                    f"{_esc(finding.recommendation)} |"
+                )
+            lines.append("")
 
     analysis = meta.get("analysis", {})
     lines.append("## Method & limits")
     lines.append("")
+    languages = meta.get("languages") or {}
+    language_text = ", ".join(f"{name} ({count})" for name, count in sorted(languages.items())) or "none detected"
+    lines.append(
+        f"- Scope: **{meta.get('files_discovered', '?')}** files discovered, "
+        f"**{meta.get('python_files', 0)}** Python and **{meta.get('java_files', 0)}** Java sources indexed, "
+        f"**{meta.get('files_skipped', 0)}** skipped. Languages: {_esc(language_text)}."
+    )
+    unsupported = meta.get("unsupported_security_languages") or []
+    if unsupported:
+        lines.append(
+            "- Security rules cover Python and Java only; no checks were run for: "
+            + ", ".join(f"`{_esc(name)}`" for name in unsupported)
+            + "."
+        )
+    if meta.get("config_hash"):
+        lines.append(
+            f"- Configuration fingerprint: `{meta['config_hash']}`; commit: "
+            f"`{meta.get('commit') or 'unknown'}`."
+        )
+    parse_errors = analysis.get("parse_errors") or []
+    if parse_errors:
+        parse_preview = ", ".join(f"`{_esc(path)}`" for path in parse_errors[:10])
+        suffix = f" (+{len(parse_errors) - 10} more)" if len(parse_errors) > 10 else ""
+        lines.append(f"- Could not parse: {parse_preview}{suffix}.")
     lines.append(
         "- Symbols come from `ast`; imports and calls are resolved through package roots, "
         "aliases, relative imports, class members, and one-level assignment inference."

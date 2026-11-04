@@ -23,6 +23,8 @@ This guide outlines our development workflow, architectural principles, coding s
   - [Cross-Platform File Handling](#3-cross-platform-file-handling)
   - [Modern Python Typing (3.10+)](#4-modern-python-typing-310)
   - [Security Best Practices](#5-security-best-practices)
+  - [Dependency Pinning & Supply Chain](#6-dependency-pinning--supply-chain)
+- [Branching Model](#branching-model)
 - [Pull Request Process](#-pull-request-process)
 - [Commit Message Conventions](#-commit-message-conventions)
 - [Reporting Security Vulnerabilities](#-reporting-security-vulnerabilities)
@@ -76,7 +78,7 @@ We are committed to providing a friendly, safe, and welcoming environment for al
 
 3. **Install the package in editable mode with development dependencies**:
    ```bash
-   pip install --upgrade pip
+   python -m pip install "pip==26.3"
    pip install -e ".[dev]"
    ```
 
@@ -107,7 +109,7 @@ python -m coverage run -m unittest discover -s tests
 python -m coverage report
 ```
 
-> **Note**: Test suite must achieve **≥ 80% coverage** across `secdiagram_core`. All existing 97+ tests must pass without regressions.
+> **Note**: Test suite must achieve **≥ 80% coverage** across `secdiagram_core`. All existing 134+ tests must pass without regressions.
 
 ### Linting and Formatting
 
@@ -226,12 +228,41 @@ secdiagram/
 - **Subprocess Safety**: Pass commands as argument lists (`['mmdc', '-i', ...]`): never use `shell=True`. Set explicit execution timeouts.
 - **Network Calls**: Always set explicit `timeout` on `urllib.request.urlopen`.
 
+### 6. Dependency Pinning & Supply Chain
+- Keep `dependencies = []` empty; the runtime remains standard-library only.
+- Pin every development/build dependency with an exact `==` version in `pyproject.toml`. Never use ranges, `>=`, or `latest`.
+- Pin GitHub Actions to full commit SHAs with a trailing version comment, and let Dependabot keep them current.
+- Pin container and Compose images to an exact tag **and** `@sha256:` digest.
+- Install Node tooling from the committed `docker/mermaid/package-lock.json` using `npm ci --omit=dev`; never use floating `npm install` in the image build.
+- Treat any new dependency as a security review item: prefer first-party, actively maintained projects with reproducible lockfiles.
+
+---
+
+## Branching Model
+
+| Branch | Purpose | Direct commits | Promotion |
+|---|---|---|---|
+| `main` | Stable, release-ready | Never | `develop` → `main` via release PR |
+| `develop` | Integration | Never | Feature branches merged locally |
+| `feat/...`, `fix/...`, `ci/...`, `docs/...` | Short-lived work | Yes | PR or local merge into `develop` |
+
+- Branch from `develop` and keep it current with `origin/develop` before starting.
+- `develop` must always contain the latest `main`.
+- Merge features into `develop` locally only after the full verification suite passes; push `develop` after a clean merge.
+- Promote `develop` to `main` only when a release is ready and all CI gates pass.
+- Tag releases on `main` after the release merge is verified.
+- After a release, sync `main` back into `develop`; the `develop-sync.yml` workflow does this automatically and fails loudly on conflicts.
+- Never force-push `main`, `develop`, or any shared branch.
+
 ---
 
 ## 🤝 Pull Request Process
 
-1. **Fork and branch**: Create a branch with a descriptive name:
+1. **Fork and branch from `develop`**:
    ```bash
+   git fetch origin
+   git checkout develop
+   git merge --ff-only origin/develop
    git checkout -b feat/add-go-manifest-detection
    # or
    git checkout -b fix/sanitize-mermaid-subgraph-ids
@@ -252,11 +283,13 @@ secdiagram/
      git diff --cached
      ```
 
-4. **Submit PR**: Open a Pull Request targeting the `main` branch. Provide a clear description of:
+4. **Submit PR**: Open a Pull Request targeting the `develop` branch. Provide a clear description of:
    - What the PR accomplishes.
    - Why the change is needed.
    - Relevant issue numbers.
    - Test results.
+
+5. **Release promotion**: Maintainers merge `develop` into `main` via a release Pull Request only when the release is ready, then tag the verified commit on `main`.
 
 ---
 

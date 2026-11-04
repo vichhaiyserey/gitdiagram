@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 import zlib
 from pathlib import Path
@@ -123,10 +124,13 @@ def render_kroki(
 
     base = (
         endpoint
-        or os.environ.get("GITDIAGRAM_IMAGE_ENDPOINT")
+        or os.environ.get("SECDIAGRAM_IMAGE_ENDPOINT")
         or os.environ.get("KROKI_ENDPOINT")
         or "https://kroki.io"
     ).rstrip("/")
+    scheme = urllib.parse.urlsplit(base).scheme.lower()
+    if scheme not in {"http", "https"}:
+        raise ImageRenderError(f"Invalid image endpoint scheme: {scheme!r}. Must be http or https.")
     url = f"{base}/mermaid/{fmt}"
     data = source.encode("utf-8")
     headers = {
@@ -178,9 +182,12 @@ def render_mermaid_ink(
 
     base = (
         endpoint
-        or os.environ.get("GITDIAGRAM_IMAGE_ENDPOINT")
+        or os.environ.get("SECDIAGRAM_IMAGE_ENDPOINT")
         or "https://mermaid.ink"
     ).rstrip("/")
+    scheme = urllib.parse.urlsplit(base).scheme.lower()
+    if scheme not in {"http", "https"}:
+        raise ImageRenderError(f"Invalid image endpoint scheme: {scheme!r}. Must be http or https.")
     url = f"{base}/{path_type}/pako:{encoded}"
     headers = {
         "User-Agent": "secdiagram",
@@ -235,9 +242,9 @@ def render_image(
             f"Unsupported image format: {image_format}. Must be one of: png, svg, pdf"
         )
 
-    is_offline = offline or os.environ.get("GITDIAGRAM_OFFLINE", "").strip().lower() in {"1", "true", "yes"}
+    is_offline = offline or os.environ.get("SECDIAGRAM_OFFLINE", "").strip().lower() in {"1", "true", "yes"}
 
-    env_provider = os.environ.get("GITDIAGRAM_IMAGE_PROVIDER", "").strip().lower()
+    env_provider = os.environ.get("SECDIAGRAM_IMAGE_PROVIDER", "").strip().lower()
     chosen_provider = env_provider or provider.lower()
 
     if is_offline and chosen_provider in {"kroki", "mermaid.ink"}:

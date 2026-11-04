@@ -138,6 +138,17 @@ class ImageRenderTests(unittest.TestCase):
                     render_kroki("flowchart LR\n A --> B", out_file, image_format="png")
                 self.assertIn("connection failed: Connection refused", str(ctx.exception))
 
+    def test_endpoint_scheme_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out_file = Path(tmp) / "diagram.png"
+            with self.assertRaises(ImageRenderError) as ctx:
+                render_kroki("flowchart LR\n A --> B", out_file, endpoint="file:///etc/passwd")
+            self.assertIn("Invalid image endpoint scheme: 'file'", str(ctx.exception))
+
+            with self.assertRaises(ImageRenderError) as ctx2:
+                render_mermaid_ink("flowchart LR\n A --> B", out_file, endpoint="ftp://malicious.com")
+            self.assertIn("Invalid image endpoint scheme: 'ftp'", str(ctx2.exception))
+
     def test_mermaid_ink_render_mocked(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             out_file = Path(tmp) / "diagram.svg"

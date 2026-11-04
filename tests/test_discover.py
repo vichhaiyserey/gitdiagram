@@ -91,6 +91,27 @@ class DiscoverTests(unittest.TestCase):
             self.assertNotIn("symlinked.py", info.rel_files)
             self.assertTrue(any("symlink outside root" in s for s in info.skipped))
 
+    def test_git_symlink_outside_root_skipped(self) -> None:
+        import os
+        with tempfile.TemporaryDirectory() as external_dir, tempfile.TemporaryDirectory() as repo_dir:
+            secret = Path(external_dir) / "secret.txt"
+            secret.write_text("classified", encoding="utf-8")
+            repo = Path(repo_dir)
+            try:
+                subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            except (OSError, subprocess.SubprocessError):
+                return
+            symlink_py = repo / "symlinked.py"
+            try:
+                os.symlink(secret, symlink_py)
+            except OSError:
+                return  # OS does not support symlinks without elevated privileges
+
+            info = discover(repo)
+            self.assertTrue(info.is_git)
+            self.assertNotIn("symlinked.py", info.rel_files)
+            self.assertTrue(any("symlink outside root" in s for s in info.skipped))
+
 
 if __name__ == "__main__":
     unittest.main()

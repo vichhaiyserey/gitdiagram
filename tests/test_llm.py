@@ -66,7 +66,7 @@ class LLMTests(unittest.TestCase):
         }
         response_bytes = json.dumps(fake_response).encode("utf-8")
 
-        with mock.patch.dict(os.environ, {"GITDIAGRAM_LLM_API_KEY": "test-key"}):
+        with mock.patch.dict(os.environ, {"SECDIAGRAM_LLM_API_KEY": "test-key"}):
             with mock.patch("urllib.request.urlopen", return_value=DummyHTTPResponse(response_bytes)) as mock_urlopen:
                 narrative = generate_narrative(self.graph)
                 self.assertIn("# Architecture Narrative", narrative)
@@ -77,14 +77,14 @@ class LLMTests(unittest.TestCase):
                 self.assertEqual(req.headers.get("Authorization"), "Bearer test-key")
 
     def test_generate_narrative_missing_key(self) -> None:
-        clean_env = {k: v for k, v in os.environ.items() if k not in ("GITDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
+        clean_env = {k: v for k, v in os.environ.items() if k not in ("SECDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
         with mock.patch.dict(os.environ, clean_env, clear=True):
             with self.assertRaises(NarrativeError) as ctx:
                 generate_narrative(self.graph)
             self.assertIn("no LLM key found", str(ctx.exception))
 
     def test_generate_narrative_http_error(self) -> None:
-        with mock.patch.dict(os.environ, {"GITDIAGRAM_LLM_API_KEY": "test-key"}):
+        with mock.patch.dict(os.environ, {"SECDIAGRAM_LLM_API_KEY": "test-key"}):
             with mock.patch(
                 "urllib.request.urlopen",
                 side_effect=urllib.error.HTTPError(
@@ -100,7 +100,7 @@ class LLMTests(unittest.TestCase):
                 self.assertIn("LLM request failed", str(ctx.exception))
 
     def test_generate_narrative_malformed_json(self) -> None:
-        with mock.patch.dict(os.environ, {"GITDIAGRAM_LLM_API_KEY": "test-key"}):
+        with mock.patch.dict(os.environ, {"SECDIAGRAM_LLM_API_KEY": "test-key"}):
             with mock.patch("urllib.request.urlopen", return_value=DummyHTTPResponse(b"not json")):
                 with self.assertRaises(NarrativeError) as ctx:
                     generate_narrative(self.graph)
@@ -108,7 +108,7 @@ class LLMTests(unittest.TestCase):
 
     def test_generate_narrative_missing_choices(self) -> None:
         empty_payload = json.dumps({"choices": []}).encode("utf-8")
-        with mock.patch.dict(os.environ, {"GITDIAGRAM_LLM_API_KEY": "test-key"}):
+        with mock.patch.dict(os.environ, {"SECDIAGRAM_LLM_API_KEY": "test-key"}):
             with mock.patch("urllib.request.urlopen", return_value=DummyHTTPResponse(empty_payload)):
                 with self.assertRaises(NarrativeError) as ctx:
                     generate_narrative(self.graph)
@@ -119,7 +119,7 @@ class LLMTests(unittest.TestCase):
             "choices": [{"message": {"content": "# Qwen Narrative\nArchitecture summary."}}]
         }
         response_bytes = json.dumps(fake_response).encode("utf-8")
-        clean_env = {k: v for k, v in os.environ.items() if k not in ("GITDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
+        clean_env = {k: v for k, v in os.environ.items() if k not in ("SECDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
 
         with mock.patch.dict(os.environ, clean_env, clear=True):
             with mock.patch("urllib.request.urlopen", return_value=DummyHTTPResponse(response_bytes)) as mock_urlopen:
@@ -135,7 +135,7 @@ class LLMTests(unittest.TestCase):
             "choices": [{"message": {"content": "# Qwen 7B Narrative"}}]
         }
         response_bytes = json.dumps(fake_response).encode("utf-8")
-        clean_env = {k: v for k, v in os.environ.items() if k not in ("GITDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
+        clean_env = {k: v for k, v in os.environ.items() if k not in ("SECDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
 
         with mock.patch.dict(os.environ, clean_env, clear=True):
             with mock.patch("urllib.request.urlopen", return_value=DummyHTTPResponse(response_bytes)) as mock_urlopen:
@@ -146,7 +146,7 @@ class LLMTests(unittest.TestCase):
                 self.assertEqual(body["model"], "qwen2.5:7b")
 
     def test_ollama_connection_error_has_docker_help(self) -> None:
-        clean_env = {k: v for k, v in os.environ.items() if k not in ("GITDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
+        clean_env = {k: v for k, v in os.environ.items() if k not in ("SECDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
         with mock.patch.dict(os.environ, clean_env, clear=True):
             with mock.patch("urllib.request.urlopen", side_effect=urllib.error.URLError("Connection refused")):
                 with self.assertRaises(NarrativeError) as ctx:
@@ -154,7 +154,7 @@ class LLMTests(unittest.TestCase):
                 self.assertIn("docker run -d -p 11434:11434", str(ctx.exception))
 
     def test_ollama_404_has_pull_help(self) -> None:
-        clean_env = {k: v for k, v in os.environ.items() if k not in ("GITDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
+        clean_env = {k: v for k, v in os.environ.items() if k not in ("SECDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
         with mock.patch.dict(os.environ, clean_env, clear=True):
             with mock.patch(
                 "urllib.request.urlopen",
@@ -174,7 +174,7 @@ class LLMTests(unittest.TestCase):
         for tpl in ("threat-model", "remediation", "compliance", "comprehensive"):
             fake_response = {"choices": [{"message": {"content": f"# {tpl} Review" }}]}
             response_bytes = json.dumps(fake_response).encode("utf-8")
-            with mock.patch.dict(os.environ, {"GITDIAGRAM_LLM_API_KEY": "test-key"}):
+            with mock.patch.dict(os.environ, {"SECDIAGRAM_LLM_API_KEY": "test-key"}):
                 with mock.patch("urllib.request.urlopen", return_value=DummyHTTPResponse(response_bytes)) as mock_urlopen:
                     narrative = generate_narrative(self.graph, template=tpl)
                     self.assertIn(f"# {tpl} Review", narrative)

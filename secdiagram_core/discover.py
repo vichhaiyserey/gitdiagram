@@ -132,12 +132,29 @@ def _keep(rel: str, include: list[str], exclude: list[str]) -> bool:
     return True
 
 
-def _git_files(root: Path) -> list[str] | None:
+def _git_files(root: Path) -> tuple[list[str], list[str]] | None:
     raw = _git(root, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
     if raw is None:
         return None
-    files = [item.replace("\\", "/") for item in raw.split("\0") if item]
-    return sorted(set(files))
+    raw_files = [item.replace("\\", "/") for item in raw.split("\0") if item]
+    files: list[str] = []
+    skipped: list[str] = []
+    root_resolved = root.resolve()
+    for rel in raw_files:
+        absolute = root / rel
+        if absolute.is_symlink():
+            try:
+                resolved = absolute.resolve()
+                if not resolved.is_relative_to(root_resolved):
+                    name = rel.rsplit("/", 1)[-1]
+                    skipped.append(f"symlink outside root: {name}")
+                    continue
+            except (ValueError, OSError):
+                name = rel.rsplit("/", 1)[-1]
+                skipped.append(f"unresolvable symlink: {name}")
+                continue
+        files.append(rel)
+    return sorted(set(files)), skipped
 
 
 def _walk_files(root: Path) -> tuple[list[str], list[str]]:
@@ -181,10 +198,12 @@ def discover(root: str | Path, include: list[str] | None = None, exclude: list[s
     skipped: list[str] = []
 
     if is_git:
-        found = _git_files(root_path)
-        if found is None:
+        git_res = _git_files(root_path)
+        if git_res is None:
             found, skipped = _walk_files(root_path)
             is_git = False
+        else:
+            found, skipped = git_res
     else:
         found, skipped = _walk_files(root_path)
 

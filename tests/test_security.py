@@ -32,6 +32,14 @@ class SecurityTests(unittest.TestCase):
             if finding.category == category and title_contains.lower() in finding.title.lower()
         ]
 
+    def test_tainted_findings_carry_source_to_sink_trace(self) -> None:
+        command = self._find("command", "command injection")
+        self.assertTrue(command)
+        for finding in command:
+            self.assertGreaterEqual(len(finding.trace), 2)
+            self.assertEqual(finding.trace[-1].path, finding.evidence[0].path)
+            self.assertEqual(finding.trace[-1].line, finding.evidence[0].line)
+
     def test_tainted_command_and_sql_are_critical(self) -> None:
         command = self._find("command", "command injection")
         self.assertTrue(command)

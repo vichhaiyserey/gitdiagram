@@ -96,9 +96,33 @@ class RenderTests(unittest.TestCase):
     def test_sarif(self) -> None:
         payload = json.loads(render_sarif(self.graph))
         self.assertEqual(payload["version"], "2.1.0")
-        results = payload["runs"][0]["results"]
+        run = payload["runs"][0]
+        self.assertEqual(
+            run["tool"]["driver"]["informationUri"],
+            "https://github.com/vichhaiyserey/secdiagram",
+        )
+        results = run["results"]
         self.assertEqual(len(results), len(self.graph.findings))
         self.assertTrue(all("ruleId" in result for result in results))
+        self.assertTrue(all("partialFingerprints" in result for result in results))
+        self.assertTrue(all(result["ruleIndex"] < len(run["tool"]["driver"]["rules"]) for result in results))
+        rule = run["tool"]["driver"]["rules"][0]
+        self.assertIn("precision", rule["properties"])
+        self.assertIn("security-severity", rule["properties"])
+        self.assertIn("help", rule)
+        self.assertIn("invocations", run)
+        self.assertIn("coverage", run["properties"])
+        self.assertEqual(run["properties"]["coverage"]["toolVersion"], payload["runs"][0]["tool"]["driver"]["version"])
+
+    def test_sarif_code_flows_trace_source_to_sink(self) -> None:
+        payload = json.loads(render_sarif(self.graph))
+        flows = [result for result in payload["runs"][0]["results"] if "codeFlows" in result]
+        self.assertTrue(flows)
+        steps = flows[0]["codeFlows"][0]["threadFlows"][0]["locations"]
+        self.assertGreaterEqual(len(steps), 2)
+        self.assertEqual(steps[0]["location"]["message"]["text"], "taint source")
+        self.assertEqual(steps[-1]["location"]["message"]["text"], "sink")
+        self.assertIn("relatedLocations", flows[0])
 
 
 if __name__ == "__main__":

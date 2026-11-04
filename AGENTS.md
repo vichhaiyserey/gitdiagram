@@ -27,6 +27,7 @@ Agents must **NEVER** violate these 6 cardinal rules:
 - **Action**: Never add any third-party package to `dependencies = []` in `pyproject.toml`.
 - **Allowed Exception**: Tooling required purely for developer workflows (such as `ruff`, `mypy`, `bandit`, `pip-audit`, `coverage`) belongs exclusively in `[project.optional-dependencies] dev`.
 - **Runtime implementation**: Use standard library modules (`ast`, `urllib`, `dataclasses`, `hashlib`, `json`, `pathlib`, `re`, `shutil`, `tempfile`, `subprocess`).
+- **Supply-chain pinning**: All non-runtime tooling must be exact-pinned (`==`) in `pyproject.toml`; CI must pin pip/build tool versions; GitHub Actions must use full commit SHAs with version comments; container and Compose images must use exact tags plus `@sha256:` digests; npm dependencies must be installed from the committed `docker/mermaid/package-lock.json` via `npm ci`. Never use `latest`, version ranges, or floating action tags.
 
 ### Rule 2: Strict Determinism
 - **Constraint**: The exact same codebase analyzed multiple times must produce byte-for-byte identical output (`diagram.mmd`, `diagram-highlevel.mmd`, `graph.json`, `security.sarif`, `ARCHITECTURE.md`).
@@ -56,13 +57,15 @@ Agents must **NEVER** violate these 6 cardinal rules:
   - Never edit or bypass `.gitignore` or `.dockerignore` to force-track ignored or sensitive files.
   - Run a secret pattern scan before committing.
 
-### Rule 6: Strictly No Direct Push to `main` — Always Use Feature Branches
-- **Constraint**: Autonomous AI agents must **NEVER** push commits directly to the `main` (or `master`) branch.
+### Rule 6: Promote Through `develop` — `main` Is Release-Only
+- **Constraint**: `main` is the stable, release-ready branch. Autonomous AI agents must **NEVER** push direct commits to `main` (or `master`) or `develop`, and must **NEVER** merge a feature branch directly into `main`.
 - **Action**:
-  - Never run `git push origin main` or attempt to push directly to `main`.
-  - Always check out a dedicated, descriptively named feature or bugfix branch (e.g. `feature/...`, `feat/...`, `fix/...`, `ci/...`) before committing or pushing.
-  - Push changes exclusively to the feature branch: `git push -u origin <branch-name>`.
-  - Open a Pull Request (PR) against `main` for CI validation and human review.
+  - Treat `develop` as the integration branch and keep it current with `main`.
+  - Create feature branches from `develop`, push them to `origin`, and merge them into `develop` locally after verification.
+  - Push `develop` only as the result of a clean local feature-branch merge or the automated `develop-sync.yml` main sync.
+  - Open Pull Requests against `develop` for CI validation and human review.
+  - Merge `develop` into `main` only when a release is ready; release tags belong on `main`.
+  - After a release, sync `main` back into `develop` (the `develop-sync.yml` workflow automates this and fails loudly on conflicts).
 
 ---
 
@@ -74,6 +77,7 @@ When implementing fixes or enhancements, modify only the relevant modules:
 |---|---|---|
 | [`secdiagram_core/discover.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/discover.py) | Repository enumeration, `.gitignore` parsing, polyglot manifest detection | `discover_repo()`, `RepoContext` |
 | [`secdiagram_core/ast_index.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/ast_index.py) | Python AST parsing for definitions, routes, calls, tasks, type annotations | `index_repo()`, `FileIndex`, `DefRec`, `CallRec` |
+| [`secdiagram_core/java_index.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/java_index.py) | Stdlib-only Java/Spring lexical indexer, DI/call graph edges, and Java SAST heuristics | `index_java()`, `build_java_graph()`, `analyze_java_security()` |
 | [`secdiagram_core/resolver.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/resolver.py) | Qualified symbol resolution, star-import handling, re-exports | `Resolver`, `Resolution` |
 | [`secdiagram_core/graph_builder.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/graph_builder.py) | Assembly of dependency graph, node pruning, edge deduplication | `GraphBuilder`, `BuildStats` |
 | [`secdiagram_core/high_level.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/high_level.py) | C4 subsystem compiler, tiering (Ingress, Gateway, Services, Data, External) | `build_high_level_architecture()`, `render_mermaid_highlevel()` |
@@ -82,6 +86,7 @@ When implementing fixes or enhancements, modify only the relevant modules:
 | [`secdiagram_core/render_mermaid.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_mermaid.py) | Detailed Mermaid diagram generation, node shape styling | `render_mermaid()` |
 | [`secdiagram_core/render_image.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_image.py) | PNG/SVG/PDF rendering via local `mmdc`, Kroki, or mermaid.ink | `render_image()`, `ImageRenderError` |
 | [`secdiagram_core/render_sarif.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_sarif.py) | OASIS SARIF v2.1.0 security report generation | `render_sarif()` |
+| [`secdiagram_core/baseline.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/baseline.py) | Security baseline: load/write/deterministically suppress known findings | `load_baseline()`, `write_baseline()`, `apply_baseline()` |
 | [`secdiagram_core/render_markdown.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_markdown.py) | Markdown architecture report with citations | `render_markdown()` |
 | [`secdiagram_core/render_json.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/render_json.py) | Full structured graph JSON serializer | `render_json()` |
 | [`secdiagram_core/llm.py`](file:///C:/Users/Lenovo/projects/clone-secdiagram/secdiagram_core/llm.py) | Structured prompt templates & streaming/request handling for Ollama/OpenAI | `generate_narrative()`, `NarrativeError` |
@@ -98,7 +103,7 @@ Before declaring any coding task complete or committing changes, AI agents **MUS
 ```bash
 python -m unittest discover -s tests -v
 ```
-- **Requirement**: All 97+ tests must pass with exit code `0`.
+- **Requirement**: All 134+ tests must pass with exit code `0`.
 - If new functionality was added, corresponding unit tests must be added in `tests/test_*.py`.
 
 ### Step 2: Verify Code Quality & Type Safety
@@ -165,31 +170,57 @@ git diff
 
 When creating branches, committing changes, or pushing on behalf of the user, AI agents must:
 
-1. **Branching Protocol (Strictly No Direct Push to `main`)**:
-   - **NEVER** run `git push origin main` or attempt to push directly to `main` (or `master`).
-   - Check the active branch with `git branch --show-current`. If currently on `main`, immediately check out a dedicated feature branch before committing or pushing:
-     ```bash
-     git checkout -b <prefix>/<descriptive-name>
-     ```
+1. **Branch Roles & Promotion (Feature → `develop` → `main`)**:
+   - `main` is the stable, release-ready branch. It receives only release merges from `develop` via Pull Request.
+   - `develop` is the integration branch. It must always contain the latest `main` and all verified feature merges.
+   - Feature branches are short-lived and branch from `develop` (use `main` only for an urgent hotfix).
+   - **NEVER** commit directly to `main` or `develop`, and **NEVER** merge a feature branch directly into `main`.
+   - Check the active branch with `git branch --show-current` before committing.
    - Standard branch naming prefixes:
      - `feat/<feature-name>` for new capabilities or analyzers.
      - `fix/<bug-or-alert-name>` for bug fixes or security remediations.
      - `ci/<workflow-name>` for CI/CD workflow updates.
      - `docs/<doc-update>` for documentation updates.
      - `refactor/<module-name>` for refactoring without functional changes.
-   - Always push strictly to the feature branch:
-     ```bash
-     git push -u origin <branch-name>
-     ```
-   - Notify the user of the pushed branch name so they can review and open a Pull Request.
 
-2. **Follow Conventional Commits**:
+2. **Feature Development and Local Merge into `develop`**:
+   ```bash
+   git fetch origin
+   git checkout develop
+   git merge --ff-only origin/develop
+   git checkout -b <prefix>/<descriptive-name>
+   # implement, test, and commit
+   git push -u origin <prefix>/<descriptive-name>
+   ```
+   - Before merging, update the feature branch from the latest `develop` and run the full verification suite.
+   - Merge locally with a merge commit, resolve any conflicts on the feature branch, and never commit conflict markers:
+     ```bash
+     git fetch origin
+     git checkout develop
+     git merge --ff-only origin/develop
+     git merge --no-ff <prefix>/<descriptive-name>
+     python -m unittest discover -s tests -v
+     python -m ruff check .
+     mypy
+     python -m bandit -r secdiagram_core -lll
+     git push origin develop
+     ```
+   - Open a Pull Request targeting `develop` when human review is required.
+   - Never force-push `main`, `develop`, or any shared branch.
+
+3. **Release Promotion (`develop` → `main`)**:
+   - Merge `develop` into `main` only when the release is ready and all CI gates pass.
+   - Use a Pull Request from `develop` to `main`; do not push directly to `main`.
+   - Tag releases on `main` only after the release merge is verified. Tagging is a human release action; agents must not create or push tags unless explicitly instructed.
+   - Immediately sync `main` back into `develop` after a release so `develop` remains the latest integration branch.
+
+4. **Follow Conventional Commits**:
    - `feat:` for new capabilities or analyzers.
    - `fix:` for bug fixes.
    - `ci:` for CI/CD workflow updates.
    - `docs:` for documentation updates.
    - `test:` for test additions or refactoring.
    - `refactor:` for code restructuring without behavioral change.
-3. **Provide a Meaningful Multi-Line Description**:
+5. **Provide a Meaningful Multi-Line Description**:
    Summarize the specific technical changes, impacted modules, and test results.
-4. **Never include AI internal metadata or conversational artifacts** inside commit messages.
+6. **Never include AI internal metadata or conversational artifacts** inside commit messages.

@@ -1,13 +1,13 @@
-# syntax=docker/dockerfile:1
-
 # Stage 1: Install Mermaid CLI in official Node.js image
-FROM node:20-slim AS mermaid-builder
+FROM node:24-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c AS mermaid-builder
 ENV PUPPETEER_SKIP_DOWNLOAD=true
-RUN npm install -g @mermaid-js/mermaid-cli@11.4.2 \
+WORKDIR /opt/mermaid
+COPY docker/mermaid/package.json docker/mermaid/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts \
     && npm cache clean --force
 
 # Stage 2: Final runtime image
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:b18b261e1b4974b4f321451ad5251ded85abb22c2b8b262da527dda1d031ab30
 
 # Labels following OCI specifications
 LABEL org.opencontainers.image.title="secdiagram" \
@@ -24,11 +24,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-freefont-ttf \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy Node binary and Mermaid CLI from builder stage
-COPY --from=node:20-slim /usr/local/bin/node /usr/local/bin/node
-COPY --from=mermaid-builder /usr/local/lib/node_modules /usr/local/lib/node_modules
-RUN chmod +x /usr/local/lib/node_modules/@mermaid-js/mermaid-cli/src/cli.js \
-    && ln -sf /usr/local/lib/node_modules/@mermaid-js/mermaid-cli/src/cli.js /usr/local/bin/mmdc
+# Copy Node binary and locked Mermaid CLI dependencies from the builder stage
+COPY --from=mermaid-builder /usr/local/bin/node /usr/local/bin/node
+COPY --from=mermaid-builder /opt/mermaid/node_modules /opt/mermaid/node_modules
+RUN ln -sf /opt/mermaid/node_modules/.bin/mmdc /usr/local/bin/mmdc
 
 # Configure Puppeteer to use system Chromium without sandbox inside Docker container
 ENV PUPPETEER_SKIP_DOWNLOAD=true \

@@ -122,6 +122,8 @@ class Finding:
     confidence: float = 0.8
     evidence: list[Loc] = field(default_factory=list)
     recommendation: str = ""
+    baseline: bool = False
+    trace: list[Loc] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -136,6 +138,10 @@ class Finding:
             "evidence": [loc.to_dict() for loc in self.evidence],
             "recommendation": self.recommendation,
         }
+        if self.baseline:
+            out["baseline"] = True
+        if self.trace:
+            out["trace"] = [loc.to_dict() for loc in self.trace]
         return out
 
 

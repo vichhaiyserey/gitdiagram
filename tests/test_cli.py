@@ -45,6 +45,35 @@ class CliTests(unittest.TestCase):
             self.assertIn("wrote", stdout)
             payload = json.loads((out / "graph.json").read_text(encoding="utf-8"))
             self.assertGreater(payload["meta"]["finding_count"], 0)
+            self.assertIn("files_discovered", payload["meta"])
+            self.assertIn("config_hash", payload["meta"])
+            self.assertIn("languages", payload["meta"])
+            self.assertIn("python", payload["meta"]["languages"])
+
+    def test_min_finding_confidence_filters_findings(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            unfiltered = Path(tmp) / "unfiltered"
+            filtered = Path(tmp) / "filtered"
+            self._run(["--dir", str(FIXTURE), "--out", str(unfiltered), "--format", "json", "--quiet"])
+            self._run(
+                [
+                    "--dir",
+                    str(FIXTURE),
+                    "--out",
+                    str(filtered),
+                    "--format",
+                    "json",
+                    "--min-finding-confidence",
+                    "0.9",
+                    "--quiet",
+                ]
+            )
+            everything = json.loads((unfiltered / "graph.json").read_text(encoding="utf-8"))
+            survivors = json.loads((filtered / "graph.json").read_text(encoding="utf-8"))
+            self.assertLess(len(survivors["findings"]), len(everything["findings"]))
+            self.assertTrue(survivors["findings"])
+            self.assertTrue(all(item["confidence"] >= 0.9 for item in survivors["findings"]))
+            self.assertEqual(survivors["meta"]["finding_confidence_floor"], 0.9)
 
     def test_fail_on_critical(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -71,7 +100,7 @@ class CliTests(unittest.TestCase):
 
     def test_llm_without_key_fails_cleanly(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            env = {key: value for key, value in os.environ.items() if key not in {"OPENAI_API_KEY", "GITDIAGRAM_LLM_API_KEY"}}
+            env = {key: value for key, value in os.environ.items() if key not in {"OPENAI_API_KEY", "SECDIAGRAM_LLM_API_KEY"}}
             with mock.patch.dict(os.environ, env, clear=True):
                 code, _, stderr = self._run(
                     [

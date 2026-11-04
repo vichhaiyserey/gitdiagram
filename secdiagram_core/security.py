@@ -641,8 +641,13 @@ class SecurityAnalyzer:
                 continue
             absolute = self.root / path
             try:
-                lines = absolute.read_text(encoding="utf-8", errors="replace").splitlines()
-            except OSError:
+                resolved = absolute.resolve()
+                if not resolved.is_relative_to(self.root.resolve()) or not resolved.is_file():
+                    continue
+                if resolved.stat().st_size > 5 * 1024 * 1024:
+                    continue
+                lines = resolved.read_text(encoding="utf-8", errors="replace").splitlines()
+            except (ValueError, OSError):
                 continue
             for line_number, line in enumerate(lines, start=1):
                 match = re.match(r"\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\S.*)", line)

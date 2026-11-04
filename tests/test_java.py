@@ -19,6 +19,7 @@ from secdiagram_core.java_index import (
     build_java_graph,
     index_java,
     parse_gradle,
+    parse_pom,
 )
 from secdiagram_core.model import Graph
 
@@ -153,6 +154,27 @@ class JavaAnalyzerTests(unittest.TestCase):
             sarif = json.loads((out / "security.sarif").read_text(encoding="utf-8"))
             rule_ids = {rule["id"] for rule in sarif["runs"][0]["tool"]["driver"]["rules"]}
             self.assertTrue(any(rule.startswith("sql:") for rule in rule_ids))
+
+    def test_parse_pom_xml_bomb_and_traversal(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            # 1. XML entity bomb attempt should be safely rejected
+            bomb_pom = root / "bomb_pom.xml"
+            bomb_pom.write_text(
+                '<?xml version="1.0"?>\n'
+                '<!DOCTYPE lolz [\n'
+                ' <!ENTITY lol "lol">\n'
+                ' <!ENTITY lol1 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;">\n'
+                ']>\n'
+                '<project><artifactId>&lol1;</artifactId></project>',
+                encoding="utf-8",
+            )
+            res = parse_pom(root, "bomb_pom.xml")
+            self.assertIsNone(res)
+
+            # 2. Path traversal escaping root should be rejected
+            res_traversal = parse_pom(root, "../outside_pom.xml")
+            self.assertIsNone(res_traversal)
 
     def test_deterministic_output(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

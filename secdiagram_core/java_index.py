@@ -724,12 +724,28 @@ def _resolve_class(index: JavaIndex, name: str) -> JavaClassDef | None:
 
 # ------------------------------------------------------------------- manifests
 def parse_pom(root_dir: Path, rel_path: str) -> JavaProject | None:
+    target = root_dir / rel_path
     try:
-        tree = ET.parse(root_dir / rel_path)
-    except (ET.ParseError, OSError):
+        resolved = target.resolve()
+        if not resolved.is_relative_to(root_dir.resolve()) or not resolved.is_file():
+            return None
+        if resolved.stat().st_size > 5 * 1024 * 1024:
+            return None
+        text = resolved.read_text(encoding="utf-8", errors="replace")
+    except (ValueError, OSError):
         return None
+
+    if "<!ENTITY" in text or "<!DOCTYPE" in text:
+        if re.search(r"<!ENTITY\s+", text, re.IGNORECASE) or re.search(r"<!DOCTYPE[^>]*\[", text, re.IGNORECASE):
+            return None
+
+    try:
+        root_element = ET.fromstring(text)
+    except (ET.ParseError, ValueError):
+        return None
+
     deps: set[str] = set()
-    for dep in tree.getroot().iter():
+    for dep in root_element.iter():
         if dep.tag.rsplit("}", 1)[-1] != "dependency":
             continue
         artifact = None
@@ -743,13 +759,10 @@ def parse_pom(root_dir: Path, rel_path: str) -> JavaProject | None:
         if artifact:
             deps.add(f"{group}:{artifact}")
     name = ""
-    project = None
-    for child in tree.getroot():
+    for child in root_element:
         tag = child.tag.rsplit("}", 1)[-1]
         if tag == "artifactId":
             name = (child.text or "").strip()
-        if tag == "build" and project is None:
-            pass
     if not name:
         name = rel_path.rsplit("/", 1)[0].split("/")[-1] if "/" in rel_path else "java_project"
     return JavaProject(name=name, path=rel_path, build_tool="maven", dependencies=deps)
@@ -758,9 +771,15 @@ def parse_pom(root_dir: Path, rel_path: str) -> JavaProject | None:
 GRADLE_DEP_RE = re.compile(r"(?:implementation|api|compileOnly|runtimeOnly|testImplementation|implementation platform)\s*[('\"]([\w.\-]+:[\w.\-]+)")
 
 def parse_gradle(root_dir: Path, rel_path: str) -> JavaProject | None:
+    target = root_dir / rel_path
     try:
-        text = (root_dir / rel_path).read_text(encoding="utf-8", errors="replace")
-    except OSError:
+        resolved = target.resolve()
+        if not resolved.is_relative_to(root_dir.resolve()) or not resolved.is_file():
+            return None
+        if resolved.stat().st_size > 5 * 1024 * 1024:
+            return None
+        text = resolved.read_text(encoding="utf-8", errors="replace")
+    except (ValueError, OSError):
         return None
     name = ""
     archive = re.search(r'rootProject\.name\s*=\s*["\']([^"\']+)["\']', text)
@@ -786,9 +805,15 @@ def index_java(root: Path, rel_files: list[str]) -> JavaIndex:
     index = JavaIndex()
     java_files = sorted(path for path in rel_files if path.endswith(".java"))
     for path in java_files:
+        target = root / path
         try:
-            text = (root / path).read_text(encoding="utf-8", errors="replace")
-        except OSError:
+            resolved = target.resolve()
+            if not resolved.is_relative_to(root.resolve()) or not resolved.is_file():
+                continue
+            if resolved.stat().st_size > 5 * 1024 * 1024:
+                continue
+            text = resolved.read_text(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
             continue
         file_index = parse_java_file(path, text)
         index.files[path] = file_index
@@ -1125,9 +1150,15 @@ def loc_ref(path: str, line: int) -> str:
 
 def _scan_java_property_files(graph: Graph, index: JavaIndex, repo_root, add) -> None:
     for path in sorted(index.property_files):
+        target = repo_root / path
         try:
-            content = (repo_root / path).read_text(encoding="utf-8", errors="replace")
-        except OSError:
+            resolved = target.resolve()
+            if not resolved.is_relative_to(repo_root.resolve()) or not resolved.is_file():
+                continue
+            if resolved.stat().st_size > 5 * 1024 * 1024:
+                continue
+            content = resolved.read_text(encoding="utf-8", errors="replace")
+        except (ValueError, OSError):
             continue
         for line_no, line in enumerate(content.splitlines(), start=1):
             match = SECRET_KEY_RE.search(line)

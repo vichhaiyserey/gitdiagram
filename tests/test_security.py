@@ -158,6 +158,26 @@ class SecurityTests(unittest.TestCase):
             token_findings = [f for f in res.graph.findings if f.category == "secret"]
             self.assertGreaterEqual(len(token_findings), 1)
 
+    def test_env_symlink_outside_root_ignored(self) -> None:
+        import os
+        import tempfile
+
+        from secdiagram_core.analyzer import AnalysisConfig, run_analysis
+        with tempfile.TemporaryDirectory() as external_dir, tempfile.TemporaryDirectory() as repo_dir:
+            secret = Path(external_dir) / "real_secret.env"
+            secret.write_text("AWS_SECRET_ACCESS_KEY=mock_secret_untrusted_12345\n", encoding="utf-8")
+            repo = Path(repo_dir)
+            (repo / "dummy.py").write_text("x = 1\n", encoding="utf-8")
+            symlink_env = repo / ".env"
+            try:
+                os.symlink(secret, symlink_env)
+            except OSError:
+                return  # OS does not support symlinks without elevated privileges
+
+            res = run_analysis(AnalysisConfig(root=repo))
+            secret_findings = [f for f in res.graph.findings if f.category == "secret"]
+            self.assertEqual(len(secret_findings), 0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 import zlib
 from pathlib import Path
@@ -127,6 +128,9 @@ def render_kroki(
         or os.environ.get("KROKI_ENDPOINT")
         or "https://kroki.io"
     ).rstrip("/")
+    scheme = urllib.parse.urlsplit(base).scheme.lower()
+    if scheme not in {"http", "https"}:
+        raise ImageRenderError(f"Invalid image endpoint scheme: {scheme!r}. Must be http or https.")
     url = f"{base}/mermaid/{fmt}"
     data = source.encode("utf-8")
     headers = {
@@ -181,6 +185,9 @@ def render_mermaid_ink(
         or os.environ.get("SECDIAGRAM_IMAGE_ENDPOINT")
         or "https://mermaid.ink"
     ).rstrip("/")
+    scheme = urllib.parse.urlsplit(base).scheme.lower()
+    if scheme not in {"http", "https"}:
+        raise ImageRenderError(f"Invalid image endpoint scheme: {scheme!r}. Must be http or https.")
     url = f"{base}/{path_type}/pako:{encoded}"
     headers = {
         "User-Agent": "secdiagram",

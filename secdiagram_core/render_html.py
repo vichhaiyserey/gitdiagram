@@ -96,11 +96,13 @@ def _snippet_maps(root: Path, findings: list[Finding]) -> dict[str, dict[str, An
     root_dir = root.resolve()
     for path in sorted(windows):
         target = (root / path).resolve()
-        if not str(target).startswith(str(root_dir)) or not target.is_file():
-            continue
         try:
+            if not target.is_relative_to(root_dir) or not target.is_file():
+                continue
+            if target.stat().st_size > 5 * 1024 * 1024:
+                continue
             text = target.read_text(encoding="utf-8", errors="replace")
-        except OSError:
+        except (ValueError, OSError):
             continue
         file_lines = text.splitlines()
         collected: list[list[Any]] = []

@@ -45,12 +45,25 @@ def _node(path: str, name: str, kind: str, line: int, attrs: dict) -> Node:
     )
 
 
+def _safe_read_text(root: Path, path: str, max_size: int = 5 * 1024 * 1024) -> str | None:
+    target = root / path
+    try:
+        resolved = target.resolve()
+        if not resolved.is_relative_to(root.resolve()) or not resolved.is_file():
+            return None
+        if resolved.stat().st_size > max_size:
+            return None
+        return resolved.read_text(encoding="utf-8", errors="replace")
+    except (ValueError, OSError):
+        return None
+
+
 def _dockerfile(root: Path, path: str) -> IacResult:
     result = IacResult()
-    try:
-        lines = (root / path).read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
+    text = _safe_read_text(root, path)
+    if text is None:
         return result
+    lines = text.splitlines()
     base_images: list[str] = []
     user: str | None = None
     exposed: list[str] = []
@@ -140,10 +153,10 @@ def _dockerfile(root: Path, path: str) -> IacResult:
 
 def _compose(root: Path, path: str) -> IacResult:
     result = IacResult()
-    try:
-        lines = (root / path).read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
+    text = _safe_read_text(root, path)
+    if text is None:
         return result
+    lines = text.splitlines()
     service: str | None = None
     service_attrs: dict[str, dict] = {}
     service_nodes: dict[str, Node] = {}
@@ -228,9 +241,8 @@ def _compose(root: Path, path: str) -> IacResult:
 
 def _workflow(root: Path, path: str) -> IacResult:
     result = IacResult()
-    try:
-        text = (root / path).read_text(encoding="utf-8", errors="replace")
-    except OSError:
+    text = _safe_read_text(root, path)
+    if text is None:
         return result
     lines = text.splitlines()
     name = path.rsplit("/", 1)[-1]
@@ -327,10 +339,10 @@ K8S_KINDS = {"deployment", "statefulset", "daemonset", "pod", "job", "cronjob", 
 
 def _kubernetes(root: Path, path: str) -> IacResult:
     result = IacResult()
-    try:
-        lines = (root / path).read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
+    text = _safe_read_text(root, path)
+    if text is None:
         return result
+    lines = text.splitlines()
     kind = None
     name = path.rsplit("/", 1)[-1]
     node = None
@@ -371,10 +383,10 @@ def _kubernetes(root: Path, path: str) -> IacResult:
 
 def _terraform(root: Path, path: str) -> IacResult:
     result = IacResult()
-    try:
-        lines = (root / path).read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError:
+    text = _safe_read_text(root, path)
+    if text is None:
         return result
+    lines = text.splitlines()
     node = _node(path, path.rsplit("/", 1)[-1], "infra", 1, {"type": "terraform"})
     for number, raw in enumerate(lines, start=1):
         stripped = raw.strip()

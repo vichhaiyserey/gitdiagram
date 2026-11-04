@@ -139,9 +139,22 @@ def _parse_simple_yaml(text: str) -> dict[str, Any]:
     return result
 
 
+def _safe_read(root: Path, target: Path, max_size: int = 5 * 1024 * 1024) -> str | None:
+    try:
+        resolved = target.resolve()
+        if not resolved.is_relative_to(root.resolve()) or not resolved.is_file():
+            return None
+        if resolved.stat().st_size > max_size:
+            return None
+        return resolved.read_text(encoding="utf-8", errors="replace")
+    except (ValueError, OSError):
+        return None
+
+
 def _scan_compose_and_docker(root: Path) -> tuple[list[Subsystem], list[SubsystemConnection]]:
     subsystems: list[Subsystem] = []
     connections: list[SubsystemConnection] = []
+
 
     compose_files = [
         root / "docker-compose.yml",
@@ -153,12 +166,13 @@ def _scan_compose_and_docker(root: Path) -> tuple[list[Subsystem], list[Subsyste
 
     services_dict: dict[str, Any] = {}
     if compose_path:
-        try:
-            content = compose_path.read_text(encoding="utf-8", errors="replace")
-            parsed = _parse_simple_yaml(content)
-            services_dict = parsed.get("services", {})
-        except OSError:
-            pass
+        content = _safe_read(root, compose_path)
+        if content:
+            try:
+                parsed = _parse_simple_yaml(content)
+                services_dict = parsed.get("services", {})
+            except Exception:
+                pass
 
     has_dockerfile = (root / "Dockerfile").is_file()
     if has_dockerfile or compose_path:
@@ -333,19 +347,18 @@ def _scan_dotnet(
             dns[:] = [d for d in dns if d not in {"bin", "obj", ".vs"}]
             for fn in fns:
                 if fn.endswith((".cs", ".fs")):
-                    try:
-                        code = (Path(dp) / fn).read_text(encoding="utf-8", errors="replace")
-                        if "ControllerBase" in code or "[ApiController]" in code or "Controller" in fn:
-                            endpoint_count += len(re.findall(r"\[Http(Get|Post|Put|Delete|Patch)", code)) or 1
-                        if "app.Map" in code:
-                            endpoint_count += len(re.findall(r"app\.Map(Get|Post|Put|Delete)", code))
-                        if ": DbContext" in code or ": IdentityDbContext" in code:
-                            dbcontext_count += 1
-                        if "IRequestHandler<" in code or "INotificationHandler<" in code:
-                            mediatr_count += 1
-                        class_count += len(re.findall(r"\bclass\s+[A-Za-z0-9_]+", code))
-                    except OSError:
-                        pass
+                    code = _safe_read(root, Path(dp) / fn)
+                    if code is None:
+                        continue
+                    if "ControllerBase" in code or "[ApiController]" in code or "Controller" in fn:
+                        endpoint_count += len(re.findall(r"\[Http(Get|Post|Put|Delete|Patch)", code)) or 1
+                    if "app.Map" in code:
+                        endpoint_count += len(re.findall(r"app\.Map(Get|Post|Put|Delete)", code))
+                    if ": DbContext" in code or ": IdentityDbContext" in code:
+                        dbcontext_count += 1
+                    if "IRequestHandler<" in code or "INotificationHandler<" in code:
+                        mediatr_count += 1
+                    class_count += len(re.findall(r"\bclass\s+[A-Za-z0-9_]+", code))
 
         proj_data[stem] = {
             "sub_id": sub_id,
@@ -491,9 +504,12 @@ def _scan_nodejs(
         return subsystems, connections
 
     for pkg_path in pkg_files:
+        pkg_text = _safe_read(root, pkg_path)
+        if pkg_text is None:
+            continue
         try:
-            content = json.loads(pkg_path.read_text(encoding="utf-8", errors="replace"))
-        except (json.JSONDecodeError, OSError):
+            content = json.loads(pkg_text)
+        except (json.JSONDecodeError, ValueError):
             continue
 
         raw_name = content.get("name") or pkg_path.parent.name or "node_app"
@@ -551,21 +567,17 @@ def _scan_nodejs(
             dns[:] = [d for d in dns if d not in {"node_modules", "dist", ".next"}]
             for fn in fns:
                 if fn.endswith((".js", ".ts", ".jsx", ".tsx")):
-                    try:
-                        code = (Path(dp) / fn).read_text(encoding="utf-8", errors="replace")
+                    code = _safe_read(root, Path(dp) / fn)
+                    if code is not None:
                         endpoint_count += len(
                             re.findall(r"\b(router|app)\.(get|post|put|delete|patch)\s*\(", code)
                         )
                         endpoint_count += len(re.findall(r"@Controller\b", code))
                         model_count += len(re.findall(r"\b(model|Schema|Entity)\b", code))
-                    except OSError:
-                        pass
                 elif fn == "schema.prisma":
-                    try:
-                        prisma_code = (Path(dp) / fn).read_text(encoding="utf-8", errors="replace")
+                    prisma_code = _safe_read(root, Path(dp) / fn)
+                    if prisma_code is not None:
                         model_count += len(re.findall(r"\bmodel\s+[A-Za-z0-9_]+\s*\{", prisma_code))
-                    except OSError:
-                        pass
 
         details = []
         if endpoint_count > 0:
@@ -641,11 +653,17 @@ def _scan_java(
         name = proj.parent.name
         deps: set[str] = set()
         if proj.name == "pom.xml":
-            try:
-                tree = ET.parse(proj)
-            except (ET.ParseError, OSError):
+            pom_text = _safe_read(root, proj)
+            if pom_text is None:
                 continue
-            for dep in tree.getroot().iter():
+            if "<!ENTITY" in pom_text or "<!DOCTYPE" in pom_text:
+                if re.search(r"<!ENTITY\s+", pom_text, re.IGNORECASE) or re.search(r"<!DOCTYPE[^>]*\[", pom_text, re.IGNORECASE):
+                    continue
+            try:
+                tree_root = ET.fromstring(pom_text)
+            except (ET.ParseError, ValueError):
+                continue
+            for dep in tree_root.iter():
                 if dep.tag.rsplit("}", 1)[-1] != "dependency":
                     continue
                 artifact = ""
@@ -654,14 +672,13 @@ def _scan_java(
                         artifact = (child.text or "").strip()
                 if artifact:
                     deps.add(artifact.lower())
-            for child in tree.getroot():
+            for child in tree_root:
                 if child.tag.rsplit("}", 1)[-1] == "artifactId" and (child.text or "").strip():
                     name = (child.text or "").strip()
                     break
         else:
-            try:
-                text = proj.read_text(encoding="utf-8", errors="replace")
-            except OSError:
+            text = _safe_read(root, proj)
+            if text is None:
                 continue
             match = re.search(r'rootProject\.name\s*=\s*["\']([^"\']+)["\']', text)
             if match:
@@ -685,9 +702,8 @@ def _scan_java(
             for fn in fns:
                 if not fn.endswith(".java"):
                     continue
-                try:
-                    code = (Path(dp) / fn).read_text(encoding="utf-8", errors="replace")
-                except OSError:
+                code = _safe_read(root, Path(dp) / fn)
+                if code is None:
                     continue
                 endpoint_count += len(re.findall(r"@(?:Get|Post|Put|Delete|Patch|Request)Mapping\b", code))
                 controller_count += len(re.findall(r"@(?:Rest)?Controller\b", code))

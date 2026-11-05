@@ -20,6 +20,8 @@ from .render_json import render_json
 from .render_markdown import render_markdown
 from .render_mermaid import render_mermaid
 from .render_sarif import render_sarif
+from .render_security import render_security_html, render_security_markdown
+from .security_report import build_security_report
 
 FORMATS = {"json", "md", "mermaid", "sarif", "png", "svg", "pdf", "image", "html"}
 
@@ -41,6 +43,30 @@ def _parse_formats(value: str) -> list[str]:
     if not formats:
         raise argparse.ArgumentTypeError("at least one format is required")
     return formats
+
+
+def _security_reproduce_command(args: argparse.Namespace) -> str:
+    def quote(value: str) -> str:
+        return f'"{value}"' if " " in value else value
+
+    parts = [
+        "secdiagram",
+        "--dir",
+        quote(args.dir),
+        "--security-report",
+        args.security_report,
+    ]
+    if args.sonarqube_report:
+        parts.extend(["--sonarqube-report", quote(args.sonarqube_report)])
+    if args.xray_report:
+        parts.extend(["--xray-report", quote(args.xray_report)])
+    for advisory in args.advisory_db:
+        parts.extend(["--advisory-db", quote(advisory)])
+    if args.baseline:
+        parts.extend(["--baseline", quote(args.baseline)])
+    if args.fail_on != "none":
+        parts.extend(["--fail-on", args.fail_on])
+    return " ".join(parts)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -93,6 +119,12 @@ def build_parser() -> argparse.ArgumentParser:
         dest="security",
         action="store_false",
         help="disable security findings and IaC analysis",
+    )
+    parser.add_argument(
+        "--security-report",
+        choices=("html", "md", "both"),
+        default=None,
+        help="write a standalone security review (security-report.html and/or SECURITY_REVIEW.md)",
     )
     parser.add_argument(
         "--sonarqube-report",
@@ -611,6 +643,31 @@ def main(argv: list[str] | None = None) -> int:
             path = out / "NARRATIVE.md"
             path.write_text(narrative_text, encoding="utf-8", newline="\n")
             written.append(path)
+
+        if args.security_report:
+            report = build_security_report(
+                graph,
+                meta,
+                fail_on=args.fail_on,
+                reproduce=_security_reproduce_command(args),
+                narrative=narrative_text,
+            )
+            if args.security_report in {"md", "both"}:
+                path = out / "SECURITY_REVIEW.md"
+                path.write_text(
+                    render_security_markdown(report),
+                    encoding="utf-8",
+                    newline="\n",
+                )
+                written.append(path)
+            if args.security_report in {"html", "both"}:
+                path = out / "security-report.html"
+                path.write_text(
+                    render_security_html(report),
+                    encoding="utf-8",
+                    newline="\n",
+                )
+                written.append(path)
 
         if "html" in args.format:
             mermaid_js_text: str | None = None

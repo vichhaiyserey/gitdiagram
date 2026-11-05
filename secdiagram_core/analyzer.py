@@ -152,6 +152,7 @@ def run_analysis(config: AnalysisConfig) -> AnalysisResult:
             "security_languages": list(SECURITY_LANGUAGES),
             "unsupported_security_languages": unsupported_languages,
             "config_hash": config_hash,
+            "security_enabled": config.security,
             "include": sorted(config.include),
             "exclude": sorted(config.exclude),
             "min_confidence": config.min_confidence,

@@ -307,6 +307,27 @@ python secdiagram.py --xray-report xray.json --advisory-db advisories/
 - Imported findings participate in severity thresholds, baselines, Markdown/HTML, LLM evidence
   packs, and SARIF (`sonarqube:external:*` / `xray:external:*` rules with validation metadata).
 
+### Standalone Security Review (`--security-report`)
+
+Generate a print-first security artifact that is separate from the architecture report:
+
+```bash
+python secdiagram.py --dir . --security-report both --format sarif --fail-on high
+```
+
+This writes:
+
+- `security-report.html` - static, A4-printable review with no CDN or JavaScript dependency.
+- `SECURITY_REVIEW.md` - the same review in reviewable Markdown.
+- `security.sarif` - unchanged machine-readable export when `--format sarif` is selected.
+
+The report includes a gate verdict, transparent risk index
+(`min(100, 20*critical + 8*high + 3*medium + 1*low)`, new findings only; the label floors at High for any critical finding and Moderate for any high finding), attack-surface
+summary, prioritized findings with `path:line` evidence and taint paths, dependency/CVE
+provenance, advisory validation, remediation roadmap, coverage, and explicit limitations.
+Baseline-suppressed findings are excluded from the risk index but remain in the evidence
+appendix. Output is deterministic and ASCII-safe.
+
 ---
 
 ## 🤖 AI Architectural Reviews (Ollama & Qwen)
@@ -376,6 +397,7 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
                   [--min-confidence MIN_CONFIDENCE] [--max-nodes MAX_NODES]
                   [--min-finding-confidence SCORE]
                   [--security] [--no-security]
+                  [--security-report {html,md,both}]
                   [--sonarqube-report PATH] [--xray-report PATH]
                   [--advisory-db PATH]
                   [--link-base LINK_BASE]
@@ -414,6 +436,7 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 | `--diagram-theme` | `modern` | Visual theme palette: `modern` (Tailwind) or `classic` |
 | `--link-base URL` | `None` | Prefix for clickable source links (e.g. `https://github.com/org/repo/blob/main`) |
 | `--security / --no-security` | enabled | Toggle SAST security rules and IaC configuration checks |
+| `--security-report {html,md,both}` | `none` | Write a standalone `security-report.html` and/or `SECURITY_REVIEW.md` |
 | `--sonarqube-report PATH` | `none` | Import a SonarQube issues JSON export as security findings |
 | `--xray-report PATH` | `none` | Import JFrog Xray violations JSON as dependency findings |
 | `--advisory-db PATH` | `none` | Validate imported CVEs against a local CISA KEV/NVD/OSV JSON file or directory (repeatable) |
@@ -434,7 +457,7 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 
 ## 🧪 Comprehensive Test Suite
 
-`secdiagram` includes 178 unit tests covering AST discovery, call resolution, polyglot .NET, Java/Spring, and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, supply-chain pinning, and deterministic CLI behaviors:
+`secdiagram` includes 188 unit tests covering AST discovery, call resolution, polyglot .NET, Java/Spring, and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, supply-chain pinning, and deterministic CLI behaviors:
 
 ```bash
 # Run all unit tests:

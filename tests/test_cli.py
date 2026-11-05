@@ -123,7 +123,17 @@ class CliTests(unittest.TestCase):
             fake_narrative = "# Qwen Architecture\nAnalyzed with Qwen 2.5."
             with mock.patch("secdiagram_core.cli.generate_narrative", return_value=fake_narrative) as mock_gen:
                 code, _, _ = self._run(
-                    ["--dir", str(FIXTURE), "--out", str(out), "--ollama", "qwen2.5-coder", "--quiet"]
+                    [
+                        "--dir",
+                        str(FIXTURE),
+                        "--out",
+                        str(out),
+                        "--ollama",
+                        "qwen2.5-coder",
+                        "--llm-context-chars",
+                        "30000",
+                        "--quiet",
+                    ]
                 )
             self.assertEqual(code, 0)
             self.assertTrue((out / "NARRATIVE.md").exists())
@@ -131,6 +141,7 @@ class CliTests(unittest.TestCase):
             mock_gen.assert_called_once()
             self.assertEqual(mock_gen.call_args[1]["model"], "qwen2.5-coder")
             self.assertEqual(mock_gen.call_args[1]["provider"], "ollama")
+            self.assertEqual(mock_gen.call_args[1]["context_chars"], 30000)
 
     def test_entrypoint_subprocess_and_determinism(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

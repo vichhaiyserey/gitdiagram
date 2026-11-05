@@ -5,8 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .advisories import apply_advisories, load_advisories
 from .ast_index import index_repo
 from .discover import RepoInfo, discover
+from .external_reports import load_external_reports
 from .features import assign_features
 from .frameworks import annotate
 from .graph_builder import BuildStats, GraphBuilder
@@ -52,6 +54,9 @@ class AnalysisConfig:
     min_confidence: float = 0.5
     max_nodes: int = 2000
     security: bool = True
+    sonarqube_report: Path | None = None
+    xray_report: Path | None = None
+    advisory_dbs: list[Path] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -83,10 +88,24 @@ def run_analysis(config: AnalysisConfig) -> AnalysisResult:
         findings.extend(analyze_security(graph, indexes, resolver, repo.root, repo.rel_files))
         if java_index.files:
             findings.extend(analyze_java_security(graph, java_index, repo.root, repo.name))
+        external, external_summaries = load_external_reports(
+            repo.root,
+            repo.rel_files,
+            config.sonarqube_report,
+            config.xray_report,
+        )
+        findings.extend(external)
+        if external_summaries:
+            graph.meta["external_reports"] = external_summaries
     merged: dict[str, Finding] = {}
     for finding in findings:
         merged.setdefault(finding.id, finding)
     graph.findings = list(merged.values())
+    if config.advisory_dbs:
+        advisory_index, advisory_summaries = load_advisories(config.advisory_dbs)
+        validated = apply_advisories(graph.findings, advisory_index)
+        graph.meta["advisory_sources"] = advisory_summaries
+        graph.meta["advisory_validated_findings"] = validated
     graph.edges = [
         edge
         for edge in graph.edges

@@ -279,6 +279,34 @@ secdiagram --format json,md,mermaid,png,svg,pdf
 - **Terraform**: S3 buckets with public read/write ACLs, unrestricted security group ingress (`0.0.0.0/0`).
 - **GitHub Actions**: Workflows using `pull_request_target` with explicit checkouts, untrusted script execution.
 
+### External Scanner Import (SonarQube & JFrog Xray)
+
+Merge existing scanner evidence into the deterministic graph and SARIF output. Reports
+are local JSON only, bounded in size, and every external finding keeps its provenance
+(`source`, `external_id`, rule/CVE/package metadata) plus a repository `path:line`
+anchor when one is available.
+
+```bash
+# Import SonarQube issues and Xray violations, then validate CVEs against CISA KEV:
+python secdiagram.py --sonarqube-report sonar-issues.json \
+  --xray-report xray-violations.json \
+  --advisory-db cisa-kev.json --format json,md,sarif
+
+# Advisory databases may also be directories of JSON files; NVD and OSV exports work too:
+python secdiagram.py --xray-report xray.json --advisory-db advisories/
+```
+
+- **SonarQube**: tolerates both `{"issues": [...]}` exports and bare issue arrays. Security
+  vulnerabilities/hotspots are imported; code smells and closed/false-positive/won't-fix
+  issues are skipped. `impacts`, CWE, tags, rule, status, and effort are preserved.
+- **JFrog Xray**: accepts `violations` wrappers or component/artifact maps. Vulnerable
+  package, version, CVSS, fixed versions, CVE list, references, and policy/watch are kept.
+- **Advisory validation**: local **CISA KEV**, **NVD**, **OSV**, or generic CVE maps corroborate
+  imported CVEs. KEV matches force `critical` severity and `0.98` confidence; multi-source
+  matches raise confidence to `0.97`. No network request is made.
+- Imported findings participate in severity thresholds, baselines, Markdown/HTML, LLM evidence
+  packs, and SARIF (`sonarqube:external:*` / `xray:external:*` rules with validation metadata).
+
 ---
 
 ## 🤖 AI Architectural Reviews (Ollama & Qwen)
@@ -291,7 +319,15 @@ python secdiagram.py --ollama qwen2.5-coder
 
 # Choose a specialized architectural review template:
 python secdiagram.py --ollama qwen2.5-coder --llm-template comprehensive
+
+# Tune the evidence budget for small-context local models:
+python secdiagram.py --ollama qwen2.5-coder --llm-context-chars 20000
 ```
+
+Ollama requests use the native `/api/chat` endpoint with a fixed seed, `num_ctx`,
+`num_predict`, and a deterministic evidence pack that prioritizes critical/high
+findings and taint traces. Point `--llm-base-url` at a `/v1` URL (or set
+`SECDIAGRAM_OLLAMA_API=openai`) to keep using Ollama's OpenAI-compatible endpoint.
 
 ### 4 Specialized Review Profiles (`--llm-template`):
 
@@ -339,7 +375,10 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
                   [--include GLOB] [--exclude GLOB]
                   [--min-confidence MIN_CONFIDENCE] [--max-nodes MAX_NODES]
                   [--min-finding-confidence SCORE]
-                  [--security] [--no-security] [--link-base LINK_BASE]
+                  [--security] [--no-security]
+                  [--sonarqube-report PATH] [--xray-report PATH]
+                  [--advisory-db PATH]
+                  [--link-base LINK_BASE]
                   [--image [FORMAT]] [--image-format {png,svg,pdf}]
                   [--image-provider {auto,local,kroki,mermaid.ink}]
                   [--image-endpoint IMAGE_ENDPOINT] [--offline]
@@ -352,6 +391,7 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
                   [--llm-base-url LLM_BASE_URL] [--llm-api-key LLM_API_KEY]
                   [--llm-template {comprehensive,threat-model,remediation,compliance}]
                   [--llm-timeout LLM_TIMEOUT] [--llm-max-tokens LLM_MAX_TOKENS]
+                  [--llm-context-chars LLM_CONTEXT_CHARS]
                   [--fail-on {critical,high,medium,low,info,none}]
                   [--baseline FILE] [--create-baseline]
                   [--quiet] [--version]
@@ -374,15 +414,19 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 | `--diagram-theme` | `modern` | Visual theme palette: `modern` (Tailwind) or `classic` |
 | `--link-base URL` | `None` | Prefix for clickable source links (e.g. `https://github.com/org/repo/blob/main`) |
 | `--security / --no-security` | enabled | Toggle SAST security rules and IaC configuration checks |
+| `--sonarqube-report PATH` | `none` | Import a SonarQube issues JSON export as security findings |
+| `--xray-report PATH` | `none` | Import JFrog Xray violations JSON as dependency findings |
+| `--advisory-db PATH` | `none` | Validate imported CVEs against a local CISA KEV/NVD/OSV JSON file or directory (repeatable) |
 | `--min-confidence SCORE` | `0.5` | Drop call/inheritance edges below this confidence |
 | `--min-finding-confidence SCORE` | `0.0` | Drop security findings below this confidence (`0.0`-`1.0`); the applied floor is recorded in reports |
 | `--fail-on SEVERITY` | `none` | Return exit code `2` if findings meet or exceed severity threshold |
 | `--baseline FILE` | `none` | Suppress findings listed in `security.baseline.json` so CI fails only on NEW findings; report artifacts note the suppressed counts |
 | `--create-baseline` | `false` | Generate `security.baseline.json` from the current scan (path from `--baseline`, default `<out>/security.baseline.json`) and exit `0` |
-| `--ollama [MODEL]` | `qwen2.5-coder` | Generate AI review using local Ollama (`qwen2.5-coder`, `qwen2.5:7b`, etc.) |
+| `--ollama [MODEL]` | `qwen2.5-coder` | Generate AI review using local Ollama's native `/api/chat` endpoint (`qwen2.5-coder`, `qwen2.5:7b`, etc.) |
 | `--llm-template` | `comprehensive` | Prompt profile: `comprehensive`, `threat-model`, `remediation`, `compliance` |
 | `--llm-timeout` | `300s` (Ollama) | Network timeout in seconds for LLM generation |
 | `--llm-max-tokens` | `1500` | Maximum completion tokens generated by the model |
+| `--llm-context-chars` | auto | Maximum graph evidence characters sent to the LLM; auto-sized to the model context |
 | `--quiet` | `false` | Suppress console summary output |
 | `--version` | — | Display program version (`secdiagram 0.1.0`) |
 
@@ -390,7 +434,7 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 
 ## 🧪 Comprehensive Test Suite
 
-`secdiagram` includes 134 unit tests covering AST discovery, call resolution, polyglot .NET, Java/Spring, and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, supply-chain pinning, and deterministic CLI behaviors:
+`secdiagram` includes 178 unit tests covering AST discovery, call resolution, polyglot .NET, Java/Spring, and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, supply-chain pinning, and deterministic CLI behaviors:
 
 ```bash
 # Run all unit tests:

@@ -133,6 +133,51 @@ def _dockerfile(root: Path, path: str) -> IacResult:
                         "Inject secrets at runtime from a secret manager.",
                     )
                 )
+        arg_match = re.match(r"(?i)ARG\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)", line)
+        if arg_match and re.search(
+            r"(?i)(SECRET|TOKEN|PASSWORD|PASSWD|API[_-]?KEY|PRIVATE[_-]?KEY|CREDENTIAL)",
+            arg_match.group(1),
+        ):
+            value = arg_match.group(2).strip().strip('"')
+            if value and value.lower() not in {"changeme", "example", "none", "null"}:
+                result.findings.append(
+                    IacFinding(
+                        "secret",
+                        "medium",
+                        "Secret in Docker build argument",
+                        f"`{arg_match.group(1)}` is stored in image history at {path}:{number}.",
+                        path,
+                        number,
+                        "CWE-798",
+                        "Pass secrets with BuildKit secret mounts instead of ARG/ENV.",
+                    )
+                )
+        if re.search(r"(?i)\bchmod\s+(?:-R\s+)?777\b", line):
+            result.findings.append(
+                IacFinding(
+                    "container",
+                    "high",
+                    "World-writable permissions",
+                    f"chmod 777 in image at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-732",
+                    "Use least-privilege file permissions such as 750 or 640.",
+                )
+            )
+        if re.search(r"(?i)^RUN\b.*\bsudo\b", line):
+            result.findings.append(
+                IacFinding(
+                    "container",
+                    "low",
+                    "Build step uses sudo",
+                    f"Elevated build step at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-250",
+                    "Run build steps as the unprivileged build user.",
+                )
+            )
     if user is None or user.lower() in {"root", "0"}:
         result.findings.append(
             IacFinding(
@@ -200,6 +245,8 @@ def _compose(root: Path, path: str) -> IacResult:
             ("privileged", "true", "critical", "CWE-250", "Privileged container"),
             ("network_mode", "host", "high", "CWE-284", "Host network mode"),
             ("pid", "host", "high", "CWE-250", "Host PID namespace"),
+            ("ipc", "host", "high", "CWE-284", "Host IPC namespace"),
+            ("userns_mode", "host", "high", "CWE-250", "Host user namespace"),
         ):
             if not stripped.startswith(key + ":"):
                 continue
@@ -233,6 +280,81 @@ def _compose(root: Path, path: str) -> IacResult:
                     "Avoid mounting the Docker socket; use a scoped API proxy.",
                 )
             )
+        if re.match(r"(?i)-\s*(?:SYS_ADMIN|NET_ADMIN|SYS_PTRACE|SYS_MODULE|ALL)\b", stripped):
+            attrs["dangerous_capability"] = True
+            result.findings.append(
+                IacFinding(
+                    "container",
+                    "high",
+                    "Dangerous Linux capability added",
+                    f"Service `{service}` adds an elevated capability at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-250",
+                    "Drop all capabilities and add only the minimum required set.",
+                )
+            )
+        if re.search(r"(?i)(?:seccomp|apparmor)\s*[=:]\s*unconfined", stripped):
+            attrs["unconfined_profile"] = True
+            result.findings.append(
+                IacFinding(
+                    "container",
+                    "high",
+                    "Unconfined security profile",
+                    f"Service `{service}` disables a security profile at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-250",
+                    "Keep seccomp and AppArmor profiles enabled.",
+                )
+            )
+        if re.match(r"(?i)-\s*/(?:etc|proc|sys|root|home|var/lib/docker)\b", stripped):
+            result.findings.append(
+                IacFinding(
+                    "container",
+                    "high",
+                    "Sensitive host path mounted",
+                    f"Service `{service}` mounts a sensitive host path at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-250",
+                    "Mount only scoped data directories with read-only access.",
+                )
+            )
+        if re.match(r"(?i)user:\s*['\"]?(?:root|0)['\"]?\s*$", stripped):
+            result.findings.append(
+                IacFinding(
+                    "container",
+                    "high",
+                    "Container runs as root",
+                    f"Service `{service}` runs as root at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-250",
+                    "Set a non-root user in the service definition.",
+                )
+            )
+        env_entry = re.match(r"(?i)^-\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", stripped)
+        if env_entry is None:
+            env_entry = re.match(r"(?i)^([A-Za-z_][A-Za-z0-9_]*)\s*:\s*(\S.*)$", stripped)
+        if env_entry and re.search(
+            r"(?i)(SECRET|TOKEN|PASSWORD|PASSWD|API[_-]?KEY|PRIVATE[_-]?KEY|CREDENTIAL|ACCESS[_-]?KEY)",
+            env_entry.group(1),
+        ):
+            value = env_entry.group(2).strip().strip("'\"")
+            if value and not value.startswith(("$", "${")) and value.lower() not in {"changeme", "example", "none", "null"}:
+                result.findings.append(
+                    IacFinding(
+                        "secret",
+                        "high",
+                        "Secret in Compose environment",
+                        f"`{env_entry.group(1)}` is hardcoded in the service at {path}:{number}.",
+                        path,
+                        number,
+                        "CWE-798",
+                        "Use Compose secrets or a secret manager instead of inline values.",
+                    )
+                )
     for name, attrs in service_attrs.items():
         if name in service_nodes:
             service_nodes[name].attrs.update(attrs)
@@ -329,6 +451,47 @@ def _workflow(root: Path, path: str) -> IacResult:
                     "Avoid checking out untrusted PR code in privileged workflows.",
                 )
             )
+        if re.search(r"\bworkflow_run\s*:", stripped):
+            result.findings.append(
+                IacFinding(
+                    "ci",
+                    "medium",
+                    "workflow_run trigger",
+                    f"Privileged follow-up workflow at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-829",
+                    "Treat artifacts from the triggering workflow as untrusted input.",
+                )
+            )
+        if "run:" in stripped and re.search(
+            r"\$\{\{\s*github\.(?:event|head_ref|head\.ref)", stripped
+        ):
+            result.findings.append(
+                IacFinding(
+                    "ci",
+                    "high",
+                    "Untrusted GitHub context interpolated into a shell",
+                    f"Potential workflow script injection at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-94",
+                    "Pass untrusted values through an environment variable and quote them.",
+                )
+            )
+        if "run:" in stripped and re.search(r"\$\{\{\s*secrets\.", stripped):
+            result.findings.append(
+                IacFinding(
+                    "ci",
+                    "medium",
+                    "Secret interpolated into a shell command",
+                    f"Secret may be exposed in logs at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-532",
+                    "Pass secrets through env and avoid printing or tracing commands.",
+                )
+            )
     node.attrs.update({"actions": sorted(set(actions)), "secrets": sorted(set(secrets)), "triggers": sorted(set(triggers))})
     result.nodes.append(node)
     return result
@@ -361,8 +524,43 @@ def _kubernetes(root: Path, path: str) -> IacResult:
             ("privileged:", "true", "critical", "CWE-250", "Privileged container"),
             ("hostNetwork:", "true", "high", "CWE-284", "Host network namespace"),
             ("hostPID:", "true", "high", "CWE-250", "Host PID namespace"),
+            ("hostIPC:", "true", "high", "CWE-284", "Host IPC namespace"),
             ("runAsUser:", "0", "high", "CWE-250", "Container runs as UID 0"),
-            ("allowPrivilegeEscalation:", "true", "medium", "CWE-250", "Privilege escalation allowed"),
+            (
+                "runAsNonRoot:",
+                "false",
+                "high",
+                "CWE-250",
+                "Container permitted to run as root",
+            ),
+            (
+                "allowPrivilegeEscalation:",
+                "true",
+                "medium",
+                "CWE-250",
+                "Privilege escalation allowed",
+            ),
+            (
+                "readOnlyRootFilesystem:",
+                "false",
+                "medium",
+                "CWE-250",
+                "Writable container root filesystem",
+            ),
+            (
+                "automountServiceAccountToken:",
+                "true",
+                "medium",
+                "CWE-522",
+                "Service account token automounted",
+            ),
+            (
+                "seccompProfile:",
+                "unconfined",
+                "medium",
+                "CWE-250",
+                "Seccomp profile disabled",
+            ),
         )
         for key, value, severity, cwe, title in checks:
             if key in stripped and value in stripped.replace(" ", "").lower():
@@ -378,6 +576,45 @@ def _kubernetes(root: Path, path: str) -> IacResult:
                         "Apply least privilege and a restricted pod security profile.",
                     )
                 )
+        if stripped.startswith("hostPath:"):
+            result.findings.append(
+                IacFinding(
+                    "container",
+                    "high",
+                    "Host path volume mounted",
+                    f"Kubernetes manifest mounts a host path at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-250",
+                    "Avoid hostPath volumes; use managed persistent volumes.",
+                )
+            )
+        if re.match(r"(?i)-\s*(?:SYS_ADMIN|NET_ADMIN|SYS_PTRACE|SYS_MODULE|ALL)\b", stripped):
+            result.findings.append(
+                IacFinding(
+                    "container",
+                    "high",
+                    "Dangerous Linux capability added",
+                    f"Kubernetes manifest adds an elevated capability at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-250",
+                    "Drop ALL capabilities and add only the required ones.",
+                )
+            )
+        if re.match(r"(?i)image:\s*\S+:latest\b", stripped):
+            result.findings.append(
+                IacFinding(
+                    "supply_chain",
+                    "low",
+                    "Mutable container image tag",
+                    f"Image uses the latest tag at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-829",
+                    "Pin images by digest or an immutable version tag.",
+                )
+            )
     return result
 
 
@@ -390,7 +627,7 @@ def _terraform(root: Path, path: str) -> IacResult:
     node = _node(path, path.rsplit("/", 1)[-1], "infra", 1, {"type": "terraform"})
     for number, raw in enumerate(lines, start=1):
         stripped = raw.strip()
-        if re.search(r"cidr_blocks\s*=\s*\[[^\]]*0\.0\.0\.0/0", stripped):
+        if re.search(r"\"(?:0\.0\.0\.0/0|::/0)\"", stripped):
             result.findings.append(
                 IacFinding(
                     "cloud",
@@ -427,6 +664,70 @@ def _terraform(root: Path, path: str) -> IacResult:
                     number,
                     "CWE-311",
                     "Enable encryption at rest and in transit.",
+                )
+            )
+        if re.search(r"(?i)publicly_accessible\s*=\s*true", stripped):
+            result.findings.append(
+                IacFinding(
+                    "cloud",
+                    "high",
+                    "Database publicly accessible",
+                    f"Public database endpoint at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-284",
+                    "Disable public accessibility and place databases in private subnets.",
+                )
+            )
+        if re.search(
+            r"(?i)(?:block_public_\w+|ignore_public_acls|restrict_public_buckets)\s*=\s*false",
+            stripped,
+        ):
+            result.findings.append(
+                IacFinding(
+                    "cloud",
+                    "high",
+                    "Public access block disabled",
+                    f"Public access protections disabled at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-284",
+                    "Enable all public access block settings for storage resources.",
+                )
+            )
+        if re.search(r"(?i)\b(?:Action|actions)\s*=\s*(?:\"\\*\"|\[\s*\"\\*\"\s*\])", stripped):
+            result.findings.append(
+                IacFinding(
+                    "cloud",
+                    "high",
+                    "IAM policy allows all actions",
+                    f"Wildcard IAM action at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-732",
+                    "Scope IAM actions and resources to the minimum required set.",
+                )
+            )
+        secret_attr = re.search(
+            r"(?i)\b(?:password|passwd|secret|token|api_key|access_key|private_key)"
+            r"\s*=\s*\"([^\"$]{8,})\"",
+            stripped,
+        )
+        if secret_attr and secret_attr.group(1).lower() not in {
+            "changeme",
+            "example",
+            "placeholder",
+        }:
+            result.findings.append(
+                IacFinding(
+                    "secret",
+                    "high",
+                    "Hardcoded secret in Terraform",
+                    f"Secret literal found at {path}:{number}.",
+                    path,
+                    number,
+                    "CWE-798",
+                    "Reference a secret manager or encrypted variable instead of a literal.",
                 )
             )
     result.nodes.append(node)

@@ -16,7 +16,7 @@ from .llm import NarrativeError, generate_narrative
 from .model import SEVERITY_RANK
 from .render_html import render_html
 from .render_image import ImageRenderError, render_image
-from .render_json import render_json
+from .render_json import write_json
 from .render_markdown import render_markdown
 from .render_mermaid import render_mermaid
 from .render_sarif import render_sarif
@@ -106,6 +106,26 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=2000,
         help="cap the graph node count; 0 disables the cap (default: 2000)",
+    )
+    parser.add_argument(
+        "--jobs",
+        type=int,
+        default=0,
+        metavar="N",
+        help="parallel indexer processes; 0 = auto, 1 = serial (default: 0)",
+    )
+    parser.add_argument(
+        "--cache-dir",
+        default=None,
+        metavar="PATH",
+        help="incremental index cache directory (default: <out>/cache)",
+    )
+    parser.add_argument(
+        "--no-cache",
+        dest="cache",
+        action="store_false",
+        default=True,
+        help="disable the incremental index cache",
     )
     parser.add_argument(
         "--security",
@@ -409,6 +429,8 @@ def main(argv: list[str] | None = None) -> int:
 
     parser = build_parser()
     args = parser.parse_args(argv)
+    if args.jobs < 0:
+        parser.error("--jobs must be zero (auto) or a positive integer")
     root = _normalize_cli_path(args.dir)
 
     if args.serve:
@@ -425,6 +447,9 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     out = _normalize_cli_path(args.out) if args.out else root / ".secdiagram"
+    cache_dir = None
+    if args.cache:
+        cache_dir = _normalize_cli_path(args.cache_dir) if args.cache_dir else out / "cache"
 
     try:
         result = run_analysis(
@@ -435,6 +460,8 @@ def main(argv: list[str] | None = None) -> int:
                 min_confidence=args.min_confidence,
                 max_nodes=args.max_nodes,
                 security=args.security,
+                jobs=args.jobs,
+                cache_dir=cache_dir,
                 sonarqube_report=(
                     _normalize_cli_path(args.sonarqube_report)
                     if args.sonarqube_report
@@ -535,7 +562,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if "json" in args.format:
             path = out / "graph.json"
-            path.write_text(render_json(graph), encoding="utf-8", newline="\n")
+            write_json(graph, path)
             written.append(path)
         if "md" in args.format:
             path = out / "ARCHITECTURE.md"
@@ -735,6 +762,12 @@ def main(argv: list[str] | None = None) -> int:
             + (baseline_info if baseline_info else "")
             + polyglot_info
         )
+        if result.cache_stats:
+            parts = [
+                f"{name} {stats['hits']} hit(s)/{stats['misses']} miss(es)"
+                for name, stats in sorted(result.cache_stats.items())
+            ]
+            print("secdiagram: index cache " + ", ".join(parts), file=sys.stderr)
         if result.parse_errors:
             print(f"secdiagram: skipped {len(result.parse_errors)} file(s) with parse errors", file=sys.stderr)
         for path in written:

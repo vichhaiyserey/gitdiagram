@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .advisories import apply_advisories, load_advisories
 from .ast_index import index_repo
+from .cache import IndexCache
 from .discover import RepoInfo, discover
 from .external_reports import load_external_reports
 from .features import assign_features
@@ -57,6 +58,8 @@ class AnalysisConfig:
     sonarqube_report: Path | None = None
     xray_report: Path | None = None
     advisory_dbs: list[Path] = field(default_factory=list)
+    jobs: int = 0
+    cache_dir: Path | None = None
 
 
 @dataclass(slots=True)
@@ -67,18 +70,26 @@ class AnalysisResult:
     python_files: int
     parse_errors: list[str] = field(default_factory=list)
     java_files: int = 0
+    cache_stats: dict[str, dict[str, int | bool | str]] = field(default_factory=dict)
 
 
 def run_analysis(config: AnalysisConfig) -> AnalysisResult:
-    repo = discover(config.root, config.include, config.exclude)
-    indexes = index_repo(repo.root, repo.python_files)
+    repo = discover(
+        config.root,
+        config.include,
+        config.exclude,
+        skip_paths=[config.cache_dir] if config.cache_dir is not None else None,
+    )
+    python_cache = IndexCache(config.cache_dir, "python", repo.commit) if config.cache_dir else None
+    java_cache = IndexCache(config.cache_dir, "java", repo.commit) if config.cache_dir else None
+    indexes = index_repo(repo.root, repo.python_files, jobs=config.jobs, cache=python_cache)
     annotate(indexes)
 
     resolver = Resolver(indexes)
     builder = GraphBuilder(indexes, resolver, max_nodes=config.max_nodes)
     graph = builder.build()
 
-    java_index = index_java(repo.root, repo.rel_files)
+    java_index = index_java(repo.root, repo.rel_files, jobs=config.jobs, cache=java_cache)
     if java_index.files:
         build_java_graph(graph, java_index)
 
@@ -164,6 +175,11 @@ def run_analysis(config: AnalysisConfig) -> AnalysisResult:
             },
         }
     )
+    cache_stats: dict[str, dict[str, int | bool | str]] = {}
+    if python_cache is not None:
+        cache_stats["python"] = python_cache.summary()
+    if java_cache is not None:
+        cache_stats["java"] = java_cache.summary()
     return AnalysisResult(
         repo=repo,
         graph=graph,
@@ -171,4 +187,5 @@ def run_analysis(config: AnalysisConfig) -> AnalysisResult:
         python_files=len(indexes),
         parse_errors=parse_errors,
         java_files=len(java_index.files),
+        cache_stats=cache_stats,
     )

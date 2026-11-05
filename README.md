@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-Standard%20Library%20Only-success.svg?style=flat-square)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/Tests-97%2F97%20Passing-brightgreen.svg?style=flat-square)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-197%2F197%20Passing-brightgreen.svg?style=flat-square)](tests/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=flat-square&logo=docker&logoColor=white)](Dockerfile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Cross Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Ubuntu%20%7C%20RHEL%20%7C%20Windows-blueviolet.svg?style=flat-square)](#-100-cross-platform-matrix)
@@ -45,6 +45,7 @@
 - **Self-Contained Interactive HTML Report** (`report.html`): A single, zero-dependency HTML file embedding the full graph, security findings with copyable source snippets, subsystem architecture, diagram sources, filterable dependency tables, data-quality distributions, and dark mode. Use `--mermaid-js <bundle>` for a fully offline report.
 - **AI Architectural & Threat Modeling Reviews**: Integrates with local/containerized **Ollama (Qwen, LLaMA, DeepSeek)** or OpenAI endpoints. The LLM receives the deterministic graph and produces evidence-grounded reviews citing exact `path:line` with zero hallucinations.
 - **Hardened Multi-Stage Container**: Runs securely as an unprivileged non-root user (`secdiagram`, UID `10001`), compatible with Docker, Docker Compose, and rootless Podman on SELinux.
+- **Scale-Ready Indexing**: Content-addressed incremental cache keyed by file hash plus commit metadata, optional stdlib `ProcessPoolExecutor` indexing, bounded per-file memory, and deterministic merge order. Vendored and generated trees are excluded automatically.
 - **100% Deterministic & CI-Ready**: Same codebase produces byte-for-byte identical graphs. Exit codes signal analysis success (`0`), errors (`1`), or security threshold violations (`2`).
 - **Pinned Supply Chain**: Zero runtime dependencies; development tools use exact `==` pins; CI actions use full commit SHAs; container images use exact tags plus `@sha256:` digests; Mermaid CLI is installed from a committed npm lockfile via `npm ci`.
 
@@ -160,7 +161,26 @@ Default outputs are written directly to `<repo>/.secdiagram/`:
 
 ---
 
-### 2. Native CLI Installation
+### 2. Large Repositories (Incremental Cache & Parallel Indexing)
+
+```bash
+# Reuse per-file AST/Java indexes between runs (cache lives in <out>/cache):
+secdiagram --dir /path/to/large-repo --jobs 8
+
+# Pick a shared cache location, or disable caching for a one-off clean run:
+secdiagram --dir /path/to/large-repo --cache-dir ~/.cache/secdiagram --jobs 8
+secdiagram --dir /path/to/large-repo --no-cache --jobs 1
+```
+
+- Cache entries are keyed by the **SHA-256 of each source file** and store the repository commit as metadata, so unchanged files are reused across commits while changed files are re-indexed.
+- `--jobs 0` (default) stays serial on small repositories and automatically uses bounded workers for larger ones; `--jobs N` forces a worker count and `--jobs 1` is fully serial.
+- Parallel results are merged in sorted repository order, so `graph.json`, reports, and security outputs remain byte-for-byte deterministic.
+- Vendored (`vendor/`, `third_party/`, `Pods/`, ...), generated (`generated/`, `*_pb2.py`, `*.g.dart`, ...), coverage, and build directories are excluded during discovery.
+- Source files larger than **5 MiB** are skipped with a recorded parse error to bound memory; JSON output is streamed directly to disk.
+
+---
+
+### 3. Native CLI Installation
 
 ```bash
 # Clone the repository:
@@ -395,6 +415,7 @@ findings and taint traces. Point `--llm-base-url` at a `/v1` URL (or set
 usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
                   [--include GLOB] [--exclude GLOB]
                   [--min-confidence MIN_CONFIDENCE] [--max-nodes MAX_NODES]
+                  [--jobs N] [--cache-dir PATH] [--no-cache]
                   [--min-finding-confidence SCORE]
                   [--security] [--no-security]
                   [--security-report {html,md,both}]
@@ -435,6 +456,9 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 | `--diagram-direction`| `LR` | Diagram orientation: `LR` (horizontal) or `TB` (top-to-bottom) |
 | `--diagram-theme` | `modern` | Visual theme palette: `modern` (Tailwind) or `classic` |
 | `--link-base URL` | `None` | Prefix for clickable source links (e.g. `https://github.com/org/repo/blob/main`) |
+| `--jobs N` | `0` (auto) | Parallel indexer processes; `0` auto-tunes, `1` forces serial execution |
+| `--cache-dir PATH` | `<out>/cache` | Incremental per-file index cache keyed by content hash |
+| `--no-cache` | `false` | Disable the index cache for this run |
 | `--security / --no-security` | enabled | Toggle SAST security rules and IaC configuration checks |
 | `--security-report {html,md,both}` | `none` | Write a standalone `security-report.html` and/or `SECURITY_REVIEW.md` |
 | `--sonarqube-report PATH` | `none` | Import a SonarQube issues JSON export as security findings |
@@ -457,7 +481,7 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 
 ## 🧪 Comprehensive Test Suite
 
-`secdiagram` includes 188 unit tests covering AST discovery, call resolution, polyglot .NET, Java/Spring, and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, supply-chain pinning, and deterministic CLI behaviors:
+`secdiagram` includes 197 unit tests covering AST discovery, call resolution, polyglot .NET, Java/Spring, and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, supply-chain pinning, and deterministic CLI behaviors:
 
 ```bash
 # Run all unit tests:
@@ -465,7 +489,7 @@ python -m unittest
 ```
 
 ```text
-Ran 97 tests in 6.933s
+Ran 197 tests in 11.801s
 OK
 ```
 

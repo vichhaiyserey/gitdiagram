@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import ast
 from collections.abc import Iterable
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .cache import IndexCache, file_digest, resolve_jobs
+
 MAX_TEXT = 240
+MAX_SOURCE_BYTES = 5 * 1024 * 1024
 
 
 def _text(node: ast.AST | None) -> str:
@@ -33,6 +37,27 @@ class ImportRec:
     is_from: bool
     star: bool = False
 
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "module": self.module,
+            "names": [[name, alias] for name, alias in self.names],
+            "level": self.level,
+            "line": self.line,
+            "is_from": self.is_from,
+            "star": self.star,
+        }
+
+    @classmethod
+    def from_payload(cls, data: dict[str, Any]) -> ImportRec:
+        return cls(
+            module=data.get("module"),
+            names=[(str(pair[0]), pair[1]) for pair in data.get("names", [])],
+            level=int(data.get("level", 0)),
+            line=int(data.get("line", 0)),
+            is_from=bool(data.get("is_from", False)),
+            star=bool(data.get("star", False)),
+        )
+
 
 @dataclass(slots=True)
 class DefRec:
@@ -56,6 +81,53 @@ class DefRec:
     tags: list[str] = field(default_factory=list)
     attrs: dict[str, Any] = field(default_factory=dict)
 
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "name": self.name,
+            "qualname": self.qualname,
+            "path": self.path,
+            "line": self.line,
+            "col": self.col,
+            "end_line": self.end_line,
+            "doc": self.doc,
+            "decorators": self.decorators,
+            "bases": self.bases,
+            "parent": self.parent,
+            "args": self.args,
+            "positional_args": self.positional_args,
+            "arg_types": self.arg_types,
+            "return_type": self.return_type,
+            "is_async": self.is_async,
+            "routes": self.routes,
+            "tags": self.tags,
+            "attrs": self.attrs,
+        }
+
+    @classmethod
+    def from_payload(cls, data: dict[str, Any]) -> DefRec:
+        return cls(
+            kind=str(data["kind"]),
+            name=str(data["name"]),
+            qualname=str(data["qualname"]),
+            path=str(data["path"]),
+            line=int(data["line"]),
+            col=int(data.get("col", 0)),
+            end_line=int(data.get("end_line", 0)),
+            doc=data.get("doc"),
+            decorators=list(data.get("decorators", [])),
+            bases=list(data.get("bases", [])),
+            parent=data.get("parent"),
+            args=list(data.get("args", [])),
+            positional_args=list(data.get("positional_args", [])),
+            arg_types=dict(data.get("arg_types", {})),
+            return_type=data.get("return_type"),
+            is_async=bool(data.get("is_async", False)),
+            routes=list(data.get("routes", [])),
+            tags=list(data.get("tags", [])),
+            attrs=dict(data.get("attrs", {})),
+        )
+
 
 @dataclass(slots=True)
 class CallRec:
@@ -73,6 +145,41 @@ class CallRec:
     has_fstring: bool = False
     is_await: bool = False
 
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "scope": self.scope,
+            "scope_kind": self.scope_kind,
+            "callee": self.callee,
+            "line": self.line,
+            "col": self.col,
+            "arg_texts": self.arg_texts,
+            "arg_names": self.arg_names,
+            "arg_names_by_position": self.arg_names_by_position,
+            "keywords": self.keywords,
+            "assigned_to": self.assigned_to,
+            "has_star": self.has_star,
+            "has_fstring": self.has_fstring,
+            "is_await": self.is_await,
+        }
+
+    @classmethod
+    def from_payload(cls, data: dict[str, Any]) -> CallRec:
+        return cls(
+            scope=str(data["scope"]),
+            scope_kind=str(data["scope_kind"]),
+            callee=str(data["callee"]),
+            line=int(data["line"]),
+            col=int(data.get("col", 0)),
+            arg_texts=list(data.get("arg_texts", [])),
+            arg_names=list(data.get("arg_names", [])),
+            arg_names_by_position=[list(item) for item in data.get("arg_names_by_position", [])],
+            keywords=dict(data.get("keywords", {})),
+            assigned_to=list(data.get("assigned_to", [])),
+            has_star=bool(data.get("has_star", False)),
+            has_fstring=bool(data.get("has_fstring", False)),
+            is_await=bool(data.get("is_await", False)),
+        )
+
 
 @dataclass(slots=True)
 class AssignRec:
@@ -83,6 +190,29 @@ class AssignRec:
     value_callee: str | None = None
     value_type: str | None = None
     line: int = 0
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "scope": self.scope,
+            "target": self.target,
+            "value_text": self.value_text,
+            "value_names": self.value_names,
+            "value_callee": self.value_callee,
+            "value_type": self.value_type,
+            "line": self.line,
+        }
+
+    @classmethod
+    def from_payload(cls, data: dict[str, Any]) -> AssignRec:
+        return cls(
+            scope=str(data["scope"]),
+            target=str(data.get("target", "")),
+            value_text=str(data.get("value_text", "")),
+            value_names=list(data.get("value_names", [])),
+            value_callee=data.get("value_callee"),
+            value_type=data.get("value_type"),
+            line=int(data.get("line", 0)),
+        )
 
 
 @dataclass(slots=True)
@@ -98,6 +228,37 @@ class FileIndex:
     strings: list[tuple[str, int]] = field(default_factory=list)
     error: str | None = None
     text: str = ""
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "module": self.module,
+            "is_package": self.is_package,
+            "doc": self.doc,
+            "imports": [item.to_payload() for item in self.imports],
+            "defs": [item.to_payload() for item in self.defs],
+            "calls": [item.to_payload() for item in self.calls],
+            "assigns": [item.to_payload() for item in self.assigns],
+            "strings": [[text, line] for text, line in self.strings],
+            "error": self.error,
+            "text": self.text,
+        }
+
+    @classmethod
+    def from_payload(cls, data: dict[str, Any]) -> FileIndex:
+        return cls(
+            path=str(data["path"]),
+            module=str(data["module"]),
+            is_package=bool(data.get("is_package", False)),
+            doc=data.get("doc"),
+            imports=[ImportRec.from_payload(item) for item in data.get("imports", [])],
+            defs=[DefRec.from_payload(item) for item in data.get("defs", [])],
+            calls=[CallRec.from_payload(item) for item in data.get("calls", [])],
+            assigns=[AssignRec.from_payload(item) for item in data.get("assigns", [])],
+            strings=[(str(item[0]), int(item[1])) for item in data.get("strings", [])],
+            error=data.get("error"),
+            text=str(data.get("text", "")),
+        )
 
 
 def _expr_names(node: ast.AST | None) -> list[str]:
@@ -396,6 +557,13 @@ def index_file(root: Path, rel_path: str) -> FileIndex:
     except (ValueError, OSError) as exc:
         return FileIndex(path=rel_path, module=module, is_package=is_package, error=f"path resolution error: {exc}")
     try:
+        if absolute.stat().st_size > MAX_SOURCE_BYTES:
+            return FileIndex(
+                path=rel_path,
+                module=module,
+                is_package=is_package,
+                error=f"file exceeds {MAX_SOURCE_BYTES} byte index limit",
+            )
         text = absolute.read_text(encoding="utf-8-sig", errors="replace")
     except OSError as exc:
         return FileIndex(path=rel_path, module=module, is_package=is_package, error=f"read error: {exc}")
@@ -416,8 +584,71 @@ def index_file(root: Path, rel_path: str) -> FileIndex:
     return result
 
 
-def index_repo(root: Path, rel_paths: list[str]) -> dict[str, FileIndex]:
-    indexes: dict[str, FileIndex] = {}
-    for rel_path in rel_paths:
-        indexes[rel_path] = index_file(root, rel_path)
-    return indexes
+def _index_task(root: str, rel_path: str) -> FileIndex:
+    return index_file(Path(root), rel_path)
+
+
+def index_repo(
+    root: Path,
+    rel_paths: list[str],
+    *,
+    jobs: int = 1,
+    cache: IndexCache | None = None,
+) -> dict[str, FileIndex]:
+    """Index Python files, optionally reusing cached payloads in parallel.
+
+    Results are assembled in sorted repository order regardless of worker
+    completion order, keeping every downstream graph deterministic.
+    """
+    ordered = sorted(set(rel_paths))
+    results: dict[str, FileIndex] = {}
+    misses: list[tuple[str, str]] = []
+
+    for rel_path in ordered:
+        digest = file_digest(root / rel_path) if cache is not None and cache.enabled else None
+        if digest is not None and cache is not None:
+            payload = cache.load(rel_path, digest)
+            if payload is not None:
+                try:
+                    results[rel_path] = FileIndex.from_payload(payload)
+                    continue
+                except (KeyError, TypeError, ValueError, IndexError):
+                    cache.errors += 1
+        if digest is not None:
+            misses.append((rel_path, digest))
+        else:
+            misses.append((rel_path, ""))
+
+    workers = resolve_jobs(jobs, len(misses))
+    if workers <= 1 or len(misses) < 2:
+        for rel_path, digest in misses:
+            index = index_file(root, rel_path)
+            results[rel_path] = index
+            if cache is not None and digest:
+                cache.save(rel_path, digest, index.to_payload())
+    else:
+        try:
+            with ProcessPoolExecutor(max_workers=workers) as executor:
+                futures = {
+                    executor.submit(_index_task, str(root), rel_path): (rel_path, digest)
+                    for rel_path, digest in misses
+                }
+                for future in as_completed(futures):
+                    rel_path, digest = futures[future]
+                    try:
+                        index = future.result()
+                    except Exception:  # pragma: no cover - worker crash fallback
+                        index = index_file(root, rel_path)
+                    results[rel_path] = index
+                    if cache is not None and digest:
+                        cache.save(rel_path, digest, index.to_payload())
+        except Exception:  # pragma: no cover - pool startup/runtime fallback
+            for rel_path, digest in misses:
+                if rel_path in results:
+                    continue
+                index = index_file(root, rel_path)
+                results[rel_path] = index
+                if cache is not None and digest:
+                    cache.save(rel_path, digest, index.to_payload())
+
+    return {rel_path: results[rel_path] for rel_path in ordered if rel_path in results}

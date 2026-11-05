@@ -14,13 +14,16 @@ from __future__ import annotations
 
 import re
 import xml.etree.ElementTree as ET
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .cache import IndexCache, file_digest, resolve_jobs
 from .model import SEVERITY_RANK, Finding, Graph, Loc, Node, stable_id
 
 MAX_TEXT = 240
+MAX_SOURCE_BYTES = 5 * 1024 * 1024
 
 MAPPING_ANN: dict[str, tuple[str, ...]] = {
     "GetMapping": ("GET",),
@@ -262,6 +265,17 @@ class JavaCall:
     line: int
     instantiates: bool = False
 
+    def to_payload(self) -> dict[str, Any]:
+        return {"callee": self.callee, "line": self.line, "instantiates": self.instantiates}
+
+    @classmethod
+    def from_payload(cls, data: dict[str, Any]) -> JavaCall:
+        return cls(
+            callee=str(data["callee"]),
+            line=int(data.get("line", 0)),
+            instantiates=bool(data.get("instantiates", False)),
+        )
+
 
 @dataclass(slots=True)
 class JavaMethod:
@@ -275,6 +289,35 @@ class JavaMethod:
     locals: dict[str, str] = field(default_factory=dict)
     routes: list[dict[str, str]] = field(default_factory=list)
     role: str | None = None  # endpoint | task
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "qualname": self.qualname,
+            "path": self.path,
+            "line": self.line,
+            "params": self.params,
+            "annotations": self.annotations,
+            "body": [[line, text] for line, text in self.body],
+            "locals": self.locals,
+            "routes": self.routes,
+            "role": self.role,
+        }
+
+    @classmethod
+    def from_payload(cls, data: dict[str, Any]) -> JavaMethod:
+        return cls(
+            name=str(data["name"]),
+            qualname=str(data["qualname"]),
+            path=str(data.get("path", "")),
+            line=int(data.get("line", 0)),
+            params=list(data.get("params", [])),
+            annotations=list(data.get("annotations", [])),
+            body=[(int(item[0]), str(item[1])) for item in data.get("body", [])],
+            locals=dict(data.get("locals", {})),
+            routes=[dict(item) for item in data.get("routes", [])],
+            role=data.get("role"),
+        )
 
     def tainted_vars(self) -> set[str]:
         """Parameter variable names that may carry request-derived input."""
@@ -297,6 +340,27 @@ class JavaField:
     line: int
     annotations: list[str] = field(default_factory=list)
 
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "type_name": self.type_name,
+            "qualname": self.qualname,
+            "path": self.path,
+            "line": self.line,
+            "annotations": self.annotations,
+        }
+
+    @classmethod
+    def from_payload(cls, data: dict[str, Any]) -> JavaField:
+        return cls(
+            name=str(data["name"]),
+            type_name=str(data.get("type_name", "")),
+            qualname=str(data.get("qualname", "")),
+            path=str(data.get("path", "")),
+            line=int(data.get("line", 0)),
+            annotations=list(data.get("annotations", [])),
+        )
+
     def is_injected(self) -> bool:
         return bool(set(self.annotations) & DI_ANN)
 
@@ -316,6 +380,39 @@ class JavaClassDef:
     methods: list[JavaMethod] = field(default_factory=list)
     fields: list[JavaField] = field(default_factory=list)
 
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "name": self.name,
+            "qualname": self.qualname,
+            "package": self.package,
+            "path": self.path,
+            "line": self.line,
+            "extends": self.extends,
+            "implements": self.implements,
+            "annotations": self.annotations,
+            "request_mapping": self.request_mapping,
+            "methods": [item.to_payload() for item in self.methods],
+            "fields": [item.to_payload() for item in self.fields],
+        }
+
+    @classmethod
+    def from_payload(cls, data: dict[str, Any]) -> JavaClassDef:
+        return cls(
+            kind=str(data.get("kind", "class")),
+            name=str(data["name"]),
+            qualname=str(data.get("qualname", "")),
+            package=str(data.get("package", "")),
+            path=str(data.get("path", "")),
+            line=int(data.get("line", 0)),
+            extends=list(data.get("extends", [])),
+            implements=list(data.get("implements", [])),
+            annotations=list(data.get("annotations", [])),
+            request_mapping=str(data.get("request_mapping", "")),
+            methods=[JavaMethod.from_payload(item) for item in data.get("methods", [])],
+            fields=[JavaField.from_payload(item) for item in data.get("fields", [])],
+        )
+
     def stereotype(self) -> str | None:
         for annotation in self.annotations:
             if annotation in STEREOTYPE_ANN:
@@ -332,6 +429,23 @@ class JavaFileIndex:
     package: str = ""
     imports: list[str] = field(default_factory=list)
     classes: list[JavaClassDef] = field(default_factory=list)
+
+    def to_payload(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "package": self.package,
+            "imports": self.imports,
+            "classes": [item.to_payload() for item in self.classes],
+        }
+
+    @classmethod
+    def from_payload(cls, data: dict[str, Any]) -> JavaFileIndex:
+        return cls(
+            path=str(data["path"]),
+            package=str(data.get("package", "")),
+            imports=list(data.get("imports", [])),
+            classes=[JavaClassDef.from_payload(item) for item in data.get("classes", [])],
+        )
 
 
 @dataclass(slots=True)
@@ -786,7 +900,7 @@ def parse_pom(root_dir: Path, rel_path: str) -> JavaProject | None:
         resolved = target.resolve()
         if not resolved.is_relative_to(root_dir.resolve()) or not resolved.is_file():
             return None
-        if resolved.stat().st_size > 5 * 1024 * 1024:
+        if resolved.stat().st_size > MAX_SOURCE_BYTES:
             return None
         text = resolved.read_text(encoding="utf-8", errors="replace")
     except (ValueError, OSError):
@@ -833,7 +947,7 @@ def parse_gradle(root_dir: Path, rel_path: str) -> JavaProject | None:
         resolved = target.resolve()
         if not resolved.is_relative_to(root_dir.resolve()) or not resolved.is_file():
             return None
-        if resolved.stat().st_size > 5 * 1024 * 1024:
+        if resolved.stat().st_size > MAX_SOURCE_BYTES:
             return None
         text = resolved.read_text(encoding="utf-8", errors="replace")
     except (ValueError, OSError):
@@ -857,22 +971,91 @@ def parse_gradle(root_dir: Path, rel_path: str) -> JavaProject | None:
 
 
 # ------------------------------------------------------------------- discovery
-def index_java(root: Path, rel_files: list[str]) -> JavaIndex:
+def _load_java_file(root: Path, rel_path: str) -> JavaFileIndex | None:
+    target = root / rel_path
+    try:
+        resolved = target.resolve()
+        if not resolved.is_relative_to(root.resolve()) or not resolved.is_file():
+            return None
+        if resolved.stat().st_size > MAX_SOURCE_BYTES:
+            return None
+        text = resolved.read_text(encoding="utf-8", errors="replace")
+    except (ValueError, OSError):
+        return None
+    return parse_java_file(rel_path, text)
+
+
+def _parse_java_task(root: str, rel_path: str) -> JavaFileIndex | None:
+    return _load_java_file(Path(root), rel_path)
+
+
+def index_java(
+    root: Path,
+    rel_files: list[str],
+    *,
+    jobs: int = 1,
+    cache: IndexCache | None = None,
+) -> JavaIndex:
     """Index every Java source and manifest in the repository, deterministically."""
     index = JavaIndex()
     java_files = sorted(path for path in rel_files if path.endswith(".java"))
+    parsed: dict[str, JavaFileIndex] = {}
+    misses: list[tuple[str, str]] = []
+
     for path in java_files:
-        target = root / path
+        digest = file_digest(root / path) if cache is not None and cache.enabled else None
+        if digest is not None and cache is not None:
+            payload = cache.load(path, digest)
+            if payload is not None:
+                try:
+                    parsed[path] = JavaFileIndex.from_payload(payload)
+                    continue
+                except (KeyError, TypeError, ValueError, IndexError):
+                    cache.errors += 1
+        misses.append((path, digest or ""))
+
+    workers = resolve_jobs(jobs, len(misses))
+    if workers <= 1 or len(misses) < 2:
+        for path, digest in misses:
+            file_index = _load_java_file(root, path)
+            if file_index is None:
+                continue
+            parsed[path] = file_index
+            if cache is not None and digest:
+                cache.save(path, digest, file_index.to_payload())
+    else:
         try:
-            resolved = target.resolve()
-            if not resolved.is_relative_to(root.resolve()) or not resolved.is_file():
-                continue
-            if resolved.stat().st_size > 5 * 1024 * 1024:
-                continue
-            text = resolved.read_text(encoding="utf-8", errors="replace")
-        except (ValueError, OSError):
+            with ProcessPoolExecutor(max_workers=workers) as executor:
+                futures = {
+                    executor.submit(_parse_java_task, str(root), path): (path, digest)
+                    for path, digest in misses
+                }
+                for future in as_completed(futures):
+                    path, digest = futures[future]
+                    try:
+                        file_index = future.result()
+                    except Exception:  # pragma: no cover - worker crash fallback
+                        file_index = _load_java_file(root, path)
+                    if file_index is None:
+                        continue
+                    parsed[path] = file_index
+                    if cache is not None and digest:
+                        cache.save(path, digest, file_index.to_payload())
+        except Exception:  # pragma: no cover - pool startup/runtime fallback
+            for path, digest in misses:
+                if path in parsed:
+                    continue
+                file_index = _load_java_file(root, path)
+                if file_index is None:
+                    continue
+                parsed[path] = file_index
+                if cache is not None and digest:
+                    cache.save(path, digest, file_index.to_payload())
+
+    for path in java_files:
+        file_index = parsed.get(path)
+        if file_index is None:
             continue
-        file_index = parse_java_file(path, text)
         index.files[path] = file_index
         for cls in file_index.classes:
             index.classes_by_qualname.setdefault(cls.qualname, cls)
@@ -1230,7 +1413,7 @@ def _scan_java_property_files(graph: Graph, index: JavaIndex, repo_root, add) ->
             resolved = target.resolve()
             if not resolved.is_relative_to(repo_root.resolve()) or not resolved.is_file():
                 continue
-            if resolved.stat().st_size > 5 * 1024 * 1024:
+            if resolved.stat().st_size > MAX_SOURCE_BYTES:
                 continue
             content = resolved.read_text(encoding="utf-8", errors="replace")
         except (ValueError, OSError):

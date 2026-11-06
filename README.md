@@ -164,8 +164,8 @@ Default outputs are written directly to `<repo>/.secdiagram/`:
 
 ```bash
 # Clone the repository:
-git clone https://github.com/vichhaiyserey/gitgendiagram.git
-cd gitgendiagram
+git clone https://github.com/vichhaiyserey/secdiagram.git
+cd secdiagram
 
 # Install in editable mode:
 pip install -e .

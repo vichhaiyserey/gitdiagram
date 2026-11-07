@@ -124,6 +124,31 @@ class HtmlReportTests(unittest.TestCase):
         html_text = render_html(self.graph, self.meta, mermaid_js="window.__stub=1;")
         self.assertIn("<script>window.__stub=1;</script>", html_text)
 
+    def test_snippet_redacts_secrets(self) -> None:
+        secret = "mock-secret-value-1234567890"
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text(f'api_key = "{secret}"\n', encoding="utf-8")
+            graph = Graph()
+            graph.add_node(Node(id="n1", kind="module", name="app", qualname="app", path="app.py", line=1))
+            graph.findings.append(
+                Finding(
+                    id="f1",
+                    category="secret",
+                    severity="high",
+                    title="Possible hardcoded secret: api_key",
+                    message="Credential-like assignment found at app.py:1.",
+                    node_id="n1",
+                    evidence=[Loc("app.py", 1)],
+                )
+            )
+            html_text = render_html(graph, {"name": "secret_app"}, root=root)
+            payload = _payload(html_text)
+            snippet = payload["findings"][0]["snippet"]["lines"]
+            rendered = json.dumps(snippet)
+            self.assertNotIn(secret, rendered)
+            self.assertIn("[REDACTED]", rendered)
+
     def test_payload_is_injection_safe(self) -> None:
         tricky = Graph()
         tricky.add_node(

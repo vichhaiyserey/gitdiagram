@@ -58,12 +58,13 @@ Agents must **NEVER** violate these 6 cardinal rules:
   - Run a secret pattern scan before committing.
 
 ### Rule 6: Promote Through `develop` — `main` Is Release-Only
-- **Constraint**: `main` is the stable, release-ready branch. Autonomous AI agents must **NEVER** push direct commits to `main` (or `master`) or `develop`, and must **NEVER** merge a feature branch directly into `main`.
+- **Constraint**: `main` is the stable, release-ready branch. Autonomous AI agents must **NEVER** push direct commits to `main` (or `master`) and must **NEVER** merge a feature branch directly into `main`. All verified feature work must land on `develop` via a feature-branch merge.
 - **Action**:
   - Treat `develop` as the integration branch and keep it current with `main`.
-  - Create feature branches from `develop`, push them to `origin`, and merge them into `develop` locally after verification.
+  - Create feature branches from `develop`, commit the work, and push them to `origin`.
+  - After the full verification suite passes, **do not leave completed work uncommitted**: merge the verified feature branch into `develop` locally and push `develop`. This default commit-and-merge step is pre-authorized for verified work; it does not require a separate user request.
   - Push `develop` only as the result of a clean local feature-branch merge or the automated `develop-sync.yml` main sync.
-  - Open Pull Requests against `develop` for CI validation and human review.
+  - Open additional Pull Requests against `develop` when human review is required.
   - Merge `develop` into `main` only when a release is ready; release tags belong on `main`.
   - After a release, sync `main` back into `develop` (the `develop-sync.yml` workflow automates this and fails loudly on conflicts).
 
@@ -103,7 +104,7 @@ Before declaring any coding task complete or committing changes, AI agents **MUS
 ```bash
 python -m unittest discover -s tests -v
 ```
-- **Requirement**: All 134+ tests must pass with exit code `0`.
+- **Requirement**: The full test suite (currently 210+ tests) must pass with exit code `0`.
 - If new functionality was added, corresponding unit tests must be added in `tests/test_*.py`.
 
 ### Step 2: Verify Code Quality & Type Safety
@@ -174,7 +175,8 @@ When creating branches, committing changes, or pushing on behalf of the user, AI
    - `main` is the stable, release-ready branch. It receives only release merges from `develop` via Pull Request.
    - `develop` is the integration branch. It must always contain the latest `main` and all verified feature merges.
    - Feature branches are short-lived and branch from `develop` (use `main` only for an urgent hotfix).
-   - **NEVER** commit directly to `main` or `develop`, and **NEVER** merge a feature branch directly into `main`.
+   - **NEVER** commit directly to `main`, and **NEVER** merge a feature branch directly into `main`.
+   - Feature work may enter `develop` only through a verified feature-branch merge (never by editing `develop` in place).
    - Check the active branch with `git branch --show-current` before committing.
    - Standard branch naming prefixes:
      - `feat/<feature-name>` for new capabilities or analyzers.
@@ -183,7 +185,7 @@ When creating branches, committing changes, or pushing on behalf of the user, AI
      - `docs/<doc-update>` for documentation updates.
      - `refactor/<module-name>` for refactoring without functional changes.
 
-2. **Feature Development and Local Merge into `develop`**:
+2. **Feature Development, Verification, and Local Merge into `develop`**:
    ```bash
    git fetch origin
    git checkout develop
@@ -193,6 +195,7 @@ When creating branches, committing changes, or pushing on behalf of the user, AI
    git push -u origin <prefix>/<descriptive-name>
    ```
    - Before merging, update the feature branch from the latest `develop` and run the full verification suite.
+   - **Mandatory final step**: once all verification gates pass and the branch is clean, commit any remaining intended files, merge the feature branch into `develop`, and push `develop`. Do not stop with verified work left uncommitted or unmerged unless the user explicitly asks to pause.
    - Merge locally with a merge commit, resolve any conflicts on the feature branch, and never commit conflict markers:
      ```bash
      git fetch origin

@@ -299,12 +299,23 @@ class CliTests(unittest.TestCase):
     def test_cli_serve_dispatches_to_server(self) -> None:
         from secdiagram_core.cli import main, server_main
         with mock.patch("secdiagram_core.server.serve", return_value=0) as mock_serve:
-            code = main(["serve", "--port", "9999", "--user", "testuser", "--password", "testpass"])
+            code = main([
+                "serve", "--port", "9999", "--user", "testuser", "--password", "testpass",
+                "--insecure-no-auth", "--max-request-bytes", "4096", "--rate-limit", "50",
+                "--max-concurrent-scans", "2", "--scan-root", str(FIXTURE),
+                "--audit-log", "audit.jsonl",
+            ])
             self.assertEqual(code, 0)
             mock_serve.assert_called_once()
             self.assertEqual(mock_serve.call_args.kwargs.get("port"), 9999)
             self.assertEqual(mock_serve.call_args.kwargs.get("auth_username"), "testuser")
             self.assertEqual(mock_serve.call_args.kwargs.get("auth_password"), "testpass")
+            self.assertTrue(mock_serve.call_args.kwargs.get("insecure_no_auth"))
+            self.assertEqual(mock_serve.call_args.kwargs.get("max_request_bytes"), 4096)
+            self.assertEqual(mock_serve.call_args.kwargs.get("rate_limit_per_minute"), 50)
+            self.assertEqual(mock_serve.call_args.kwargs.get("max_concurrent_scans"), 2)
+            self.assertEqual(mock_serve.call_args.kwargs.get("scan_roots"), [str(FIXTURE)])
+            self.assertEqual(mock_serve.call_args.kwargs.get("audit_log"), "audit.jsonl")
 
         with mock.patch("secdiagram_core.server.serve", return_value=0) as mock_serve2:
             code2 = main(["--dir", str(FIXTURE), "--serve", "--server-port", "7777"])

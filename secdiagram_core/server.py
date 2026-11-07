@@ -596,8 +596,29 @@ class SecdiagramRequestHandler(BaseHTTPRequestHandler):
                 if not isinstance(requested, str) or not requested.strip():
                     self._send_json(400, {"error": "BadRequest", "message": "Scan path must be a non-empty string."})
                     return
+
+                root_text = str(state.root.resolve())
+                requested_expanded = str(Path(requested).expanduser())
+                requested_normalized = str(Path(requested_expanded))
+
+                if requested_normalized != root_text:
+                    self.platform_server.audit.log(
+                        "scan_rejected",
+                        remote=self._client_key(),
+                        path=requested,
+                        reason="path_not_allowlisted",
+                    )
+                    self._send_json(
+                        403,
+                        {
+                            "error": "Forbidden",
+                            "message": "The requested scan path is not allowlisted.",
+                        },
+                    )
+                    return
+
                 try:
-                    candidate = Path(requested).expanduser().resolve()
+                    candidate = Path(requested_normalized).resolve()
                 except (OSError, ValueError):
                     candidate = None
                 allowlisted = (

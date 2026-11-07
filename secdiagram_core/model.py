@@ -124,6 +124,9 @@ class Finding:
     recommendation: str = ""
     baseline: bool = False
     trace: list[Loc] = field(default_factory=list)
+    source: str = "secdiagram"
+    external_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         out: dict[str, Any] = {
@@ -142,6 +145,12 @@ class Finding:
             out["baseline"] = True
         if self.trace:
             out["trace"] = [loc.to_dict() for loc in self.trace]
+        if self.source != "secdiagram":
+            out["source"] = self.source
+        if self.external_id:
+            out["external_id"] = self.external_id
+        if self.metadata:
+            out["metadata"] = self.metadata
         return out
 
 

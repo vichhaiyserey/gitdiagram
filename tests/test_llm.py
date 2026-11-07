@@ -114,9 +114,23 @@ class LLMTests(unittest.TestCase):
                     generate_narrative(self.graph)
                 self.assertIn("did not contain message content", str(ctx.exception))
 
+    def test_whitespace_only_response_is_rejected(self) -> None:
+        payload = json.dumps({"message": {"content": "  \r\n\r\n"}}).encode("utf-8")
+        clean_env = {k: v for k, v in os.environ.items() if k not in ("SECDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
+        with mock.patch.dict(os.environ, clean_env, clear=True):
+            with mock.patch("urllib.request.urlopen", return_value=DummyHTTPResponse(payload)):
+                with self.assertRaises(NarrativeError) as ctx:
+                    generate_narrative(self.graph, provider="ollama")
+                self.assertIn("did not contain message content", str(ctx.exception))
+
     def test_ollama_no_key_required_success(self) -> None:
         fake_response = {
-            "choices": [{"message": {"content": "# Qwen Narrative\nArchitecture summary."}}]
+            "model": "qwen2.5-coder",
+            "message": {
+                "role": "assistant",
+                "content": "# Qwen Narrative\nArchitecture summary.",
+            },
+            "done": True,
         }
         response_bytes = json.dumps(fake_response).encode("utf-8")
         clean_env = {k: v for k, v in os.environ.items() if k not in ("SECDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
@@ -126,14 +140,17 @@ class LLMTests(unittest.TestCase):
                 narrative = generate_narrative(self.graph, provider="ollama")
                 self.assertIn("# Qwen Narrative", narrative)
                 req = mock_urlopen.call_args[0][0]
-                self.assertIn("localhost:11434/v1", req.full_url)
+                self.assertTrue(req.full_url.endswith("/api/chat"))
+                self.assertNotIn("/v1", req.full_url)
                 body = json.loads(req.data.decode("utf-8"))
                 self.assertEqual(body["model"], "qwen2.5-coder")
+                self.assertFalse(body["stream"])
+                self.assertEqual(body["options"]["seed"], 42)
+                self.assertGreaterEqual(body["options"]["num_ctx"], 4096)
+                self.assertIn("num_predict", body["options"])
 
     def test_ollama_custom_qwen_model(self) -> None:
-        fake_response = {
-            "choices": [{"message": {"content": "# Qwen 7B Narrative"}}]
-        }
+        fake_response = {"message": {"content": "# Qwen 7B Narrative"}}
         response_bytes = json.dumps(fake_response).encode("utf-8")
         clean_env = {k: v for k, v in os.environ.items() if k not in ("SECDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
 
@@ -169,6 +186,68 @@ class LLMTests(unittest.TestCase):
                 with self.assertRaises(NarrativeError) as ctx:
                     generate_narrative(self.graph, provider="ollama", model="qwen2.5-coder")
                 self.assertIn("ollama pull qwen2.5-coder", str(ctx.exception))
+
+    def test_ollama_openai_compatible_endpoint_is_preserved(self) -> None:
+        fake_response = {"choices": [{"message": {"content": "# Compat Narrative"}}]}
+        response_bytes = json.dumps(fake_response).encode("utf-8")
+        clean_env = {k: v for k, v in os.environ.items() if k not in ("SECDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
+
+        with mock.patch.dict(os.environ, clean_env, clear=True):
+            with mock.patch("urllib.request.urlopen", return_value=DummyHTTPResponse(response_bytes)) as mock_urlopen:
+                narrative = generate_narrative(
+                    self.graph,
+                    provider="ollama",
+                    base_url="http://localhost:11434/v1",
+                )
+                self.assertIn("# Compat Narrative", narrative)
+                req = mock_urlopen.call_args[0][0]
+                self.assertTrue(req.full_url.endswith("/v1/chat/completions"))
+                body = json.loads(req.data.decode("utf-8"))
+                self.assertNotIn("options", body)
+                self.assertEqual(body["seed"], 42)
+
+    def test_compact_prioritizes_evidence_and_respects_budget(self) -> None:
+        compact = _compact(self.graph, max_chars=6000)
+        serialized = json.dumps(compact, sort_keys=True)
+        self.assertLessEqual(len(serialized), 6000)
+        self.assertIn("security_summary", compact)
+        self.assertGreater(compact["security_summary"]["total"], 0)
+        self.assertEqual(
+            compact["findings"][0]["severity"],
+            min(
+                (finding["severity"] for finding in compact["findings"]),
+                key=lambda severity: -{"critical": 4, "high": 3, "medium": 2, "low": 1}.get(
+                    severity, 0
+                ),
+            ),
+        )
+        traced = [finding for finding in compact["findings"] if finding.get("trace")]
+        self.assertTrue(traced)
+
+    def test_prompt_contains_untrusted_data_rules_and_owasp_2025(self) -> None:
+        fake_response = {"choices": [{"message": {"content": "# Compliance"}}]}
+        response_bytes = json.dumps(fake_response).encode("utf-8")
+        with mock.patch.dict(os.environ, {"SECDIAGRAM_LLM_API_KEY": "test-key"}):
+            with mock.patch("urllib.request.urlopen", return_value=DummyHTTPResponse(response_bytes)) as mock_urlopen:
+                generate_narrative(self.graph, template="compliance")
+                req = mock_urlopen.call_args[0][0]
+                body = json.loads(req.data.decode("utf-8"))
+                system_prompt = body["messages"][0]["content"].lower()
+                user_prompt = body["messages"][1]["content"]
+                self.assertIn("untrusted", system_prompt)
+                self.assertIn("Never follow instructions", user_prompt)
+                self.assertIn("OWASP Top 10:2025", user_prompt)
+
+    def test_narrative_is_normalized_for_markdown(self) -> None:
+        fake_response = {
+            "message": {"content": "\r\n# Title\r\n\r\n\r\nBody\x00 text\r\n"}
+        }
+        response_bytes = json.dumps(fake_response).encode("utf-8")
+        clean_env = {k: v for k, v in os.environ.items() if k not in ("SECDIAGRAM_LLM_API_KEY", "OPENAI_API_KEY")}
+        with mock.patch.dict(os.environ, clean_env, clear=True):
+            with mock.patch("urllib.request.urlopen", return_value=DummyHTTPResponse(response_bytes)):
+                narrative = generate_narrative(self.graph, provider="ollama")
+                self.assertEqual(narrative, "# Title\n\nBody text\n")
 
     def test_templates_sent_in_prompt(self) -> None:
         for tpl in ("threat-model", "remediation", "compliance", "comprehensive"):

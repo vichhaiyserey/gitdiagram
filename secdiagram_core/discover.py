@@ -32,7 +32,24 @@ SKIP_DIRS = {
     ".next",
     ".cache",
     "target",
+    "vendor",
+    "vendors",
+    "third_party",
+    "third-party",
+    "thirdparty",
+    "bower_components",
+    "generated",
+    "generated-sources",
+    "generated_code",
+    "__generated__",
+    "coverage",
+    "htmlcov",
+    ".gradle",
+    ".mvn",
+    "obj",
+    "Pods",
 }
+SKIP_DIRS_LOWER = frozenset(name.lower() for name in SKIP_DIRS)
 
 SKIP_FILE_SUFFIXES = (
     ".pyc",
@@ -55,6 +72,32 @@ SKIP_FILE_SUFFIXES = (
     ".lock",
     ".min.js",
 )
+
+GENERATED_FILE_PATTERNS = (
+    "*_pb2.py",
+    "*_pb2_grpc.py",
+    "*_generated.py",
+    "*_generated.go",
+    "*.generated.*",
+    "*.g.dart",
+    "*.freezed.dart",
+    "*.designer.cs",
+    "*.bundle.js",
+    "*.chunk.js",
+    "*.min.js",
+)
+
+
+def _skipped_dir(name: str) -> bool:
+    return name.lower() in SKIP_DIRS_LOWER
+
+
+def _skipped_file(name: str) -> bool:
+    lower = name.lower()
+    if lower.endswith(SKIP_FILE_SUFFIXES):
+        return True
+    return any(fnmatch.fnmatch(lower, pattern) for pattern in GENERATED_FILE_PATTERNS)
+
 
 IAC_NAMES = {
     "dockerfile",
@@ -162,10 +205,10 @@ def _walk_files(root: Path) -> tuple[list[str], list[str]]:
     skipped: list[str] = []
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = sorted(
-            name for name in dirnames if name not in SKIP_DIRS and name != ".git"
+            name for name in dirnames if not _skipped_dir(name) and name != ".git"
         )
         for name in sorted(filenames):
-            if name.endswith(SKIP_FILE_SUFFIXES):
+            if _skipped_file(name):
                 continue
             absolute = Path(dirpath) / name
             if absolute.is_symlink():
@@ -185,7 +228,12 @@ def _walk_files(root: Path) -> tuple[list[str], list[str]]:
     return sorted(set(files)), skipped
 
 
-def discover(root: str | Path, include: list[str] | None = None, exclude: list[str] | None = None) -> RepoInfo:
+def discover(
+    root: str | Path,
+    include: list[str] | None = None,
+    exclude: list[str] | None = None,
+    skip_paths: list[Path] | None = None,
+) -> RepoInfo:
     root_path = Path(root).expanduser().resolve()
     if not root_path.exists():
         raise FileNotFoundError(f"directory does not exist: {root_path}")
@@ -194,6 +242,14 @@ def discover(root: str | Path, include: list[str] | None = None, exclude: list[s
 
     include = [item.replace("\\", "/") for item in (include or [])]
     exclude = [item.replace("\\", "/") for item in (exclude or [])]
+    skip_prefixes: set[str] = set()
+    for path in skip_paths or []:
+        try:
+            rel = path.expanduser().resolve().relative_to(root_path).as_posix()
+        except (ValueError, OSError):
+            continue
+        if rel and rel != ".":
+            skip_prefixes.add(rel.rstrip("/") + "/")
     is_git = _is_git_root(root_path)
     skipped: list[str] = []
 
@@ -209,9 +265,11 @@ def discover(root: str | Path, include: list[str] | None = None, exclude: list[s
 
     rel_files = []
     for rel in found:
-        if rel.endswith(SKIP_FILE_SUFFIXES):
+        if _skipped_file(rel.rsplit("/", 1)[-1]):
             continue
-        if any(part in SKIP_DIRS for part in rel.split("/")[:-1]):
+        if any(_skipped_dir(part) for part in rel.split("/")[:-1]):
+            continue
+        if any(rel.startswith(prefix) for prefix in skip_prefixes):
             continue
         if _keep(rel, include, exclude):
             rel_files.append(rel)

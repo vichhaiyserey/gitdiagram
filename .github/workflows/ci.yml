@@ -101,7 +101,9 @@ jobs:
           path: bandit.json
           if-no-files-found: ignore
       - name: Dependency vulnerability audit (pip-audit)
-        run: python -m pip_audit --strict --progress-spinner off --skip-editable
+        run: |
+          python -m pip freeze --exclude-editable > "${RUNNER_TEMP}/audit-requirements.txt"
+          python -m pip_audit --strict --progress-spinner off -r "${RUNNER_TEMP}/audit-requirements.txt"
       - name: Trivy filesystem scan
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:

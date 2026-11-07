@@ -333,7 +333,8 @@ def _scan_dotnet(
             for pref in xml_root.findall(".//ProjectReference"):
                 inc = pref.get("Include") or ""
                 if inc:
-                    target_name = Path(inc).stem
+                    # MSBuild paths use backslashes; normalise so POSIX stems resolve too.
+                    target_name = Path(inc.replace("\\", "/")).stem
                     references.append(target_name)
         except (ET.ParseError, OSError):
             continue

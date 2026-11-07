@@ -17,6 +17,7 @@ from secdiagram_core.high_level import (
     build_high_level_architecture,
     render_mermaid_highlevel,
 )
+from secdiagram_core.model import Graph
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 SAMPLE_APP_DIR = FIXTURES_DIR / "sample_app"
@@ -101,6 +102,25 @@ class HighLevelArchitectureTests(unittest.TestCase):
         self.assertIn("Shop.Application", mermaid)
         self.assertIn("Shop.Infrastructure", mermaid)
         self.assertIn("Shop.Domain", mermaid)
+
+    def test_dotnet_project_references_are_platform_stable(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Web").mkdir()
+            (root / "Core").mkdir()
+            (root / "Web" / "Web.csproj").write_text(
+                '<Project Sdk="Microsoft.NET.Sdk.Web"><ItemGroup>'
+                '<ProjectReference Include="..\\Core\\Core.csproj" />'
+                "</ItemGroup></Project>",
+                encoding="utf-8",
+            )
+            (root / "Core" / "Core.csproj").write_text(
+                '<Project Sdk="Microsoft.NET.Sdk"></Project>',
+                encoding="utf-8",
+            )
+            hla = build_high_level_architecture(root, Graph())
+            pairs = {(conn.src, conn.dst) for conn in hla.connections}
+            self.assertIn(("dotnet_Web", "dotnet_Core"), pairs)
 
     def test_sample_nodejs_app_high_level(self) -> None:
         hla = build_high_level_architecture(SAMPLE_NODEJS_DIR)

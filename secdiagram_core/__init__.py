@@ -1,6 +1,6 @@
 """secdiagram: deterministic architecture and security graphs for Python, .NET, Node.js, and polyglot repositories."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 SCHEMA_VERSION = 1
 
 from .config import SecdiagramConfig, load_config

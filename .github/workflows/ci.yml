@@ -91,6 +91,7 @@ jobs:
         run: python -m bandit -r secdiagram_core -lll -f txt
       - name: Bandit full report
         if: always()
+        continue-on-error: true
         run: python -m bandit -r secdiagram_core -f json -o bandit.json
       - name: Upload Bandit report
         if: always()

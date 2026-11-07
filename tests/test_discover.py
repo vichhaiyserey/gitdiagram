@@ -27,12 +27,22 @@ class DiscoverTests(unittest.TestCase):
         self.assertFalse(repo.is_git)
         self.assertEqual(repo.name, "sample_app")
         self.assertIn("app/main.py", repo.rel_files)
-        self.assertIn(".env", repo.rel_files)
         self.assertIn("Dockerfile", repo.rel_files)
         self.assertIn(".github/workflows/ci.yml", repo.rel_files)
         self.assertIn("k8s/deployment.yaml", repo.rel_files)
         self.assertNotIn("not_python.txt", repo.python_files)
         self.assertEqual(len(repo.python_files), 8)
+
+    def test_dotenv_files_are_discovered(self) -> None:
+        # Fixtures cannot commit .env (gitignored), so exercise discovery in a temp tree.
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "sample_app"
+            (root / "app").mkdir(parents=True)
+            (root / ".env").write_text("SAFE_SETTING=hello\n", encoding="utf-8")
+            (root / "app" / "main.py").write_text("x = 1\n", encoding="utf-8")
+            repo = discover(root)
+            self.assertIn(".env", repo.rel_files)
+            self.assertEqual(repo.name, "sample_app")
 
     def test_iac_classification(self) -> None:
         repo = discover(FIXTURE)

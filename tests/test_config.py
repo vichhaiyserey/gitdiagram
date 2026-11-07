@@ -20,6 +20,12 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(cfg.server.auth_mode, "none")
             self.assertFalse(cfg.server.read_only)
             self.assertFalse(cfg.server.is_auth_enabled())
+            self.assertFalse(cfg.server.insecure_no_auth)
+            self.assertEqual(cfg.server.max_request_bytes, 1_048_576)
+            self.assertEqual(cfg.server.rate_limit_per_minute, 240)
+            self.assertEqual(cfg.server.max_concurrent_scans, 1)
+            self.assertEqual(cfg.server.scan_roots, [])
+            self.assertIsNone(cfg.server.audit_log)
 
     def test_load_from_json_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -36,6 +42,12 @@ class ConfigTests(unittest.TestCase):
                             "auth_password": "supersecretpassword",
                             "read_only": True,
                             "cors_origins": ["http://localhost:3000"],
+                            "insecure_no_auth": False,
+                            "max_request_bytes": 2048,
+                            "rate_limit_per_minute": 60,
+                            "max_concurrent_scans": 2,
+                            "scan_roots": ["/srv/repos/one"],
+                            "audit_log": "/var/log/secdiagram/audit.jsonl",
                         },
                         "analysis": {
                             "include": ["app/**/*.py"],
@@ -57,13 +69,22 @@ class ConfigTests(unittest.TestCase):
             self.assertEqual(cfg.server.auth_username, "admin")
             self.assertEqual(cfg.server.auth_password, "supersecretpassword")
             self.assertTrue(cfg.server.read_only)
+            self.assertEqual(cfg.server.max_request_bytes, 2048)
+            self.assertEqual(cfg.server.rate_limit_per_minute, 60)
+            self.assertEqual(cfg.server.max_concurrent_scans, 2)
+            self.assertEqual(cfg.server.scan_roots, ["/srv/repos/one"])
+            self.assertEqual(cfg.server.audit_log, "/var/log/secdiagram/audit.jsonl")
             self.assertEqual(cfg.analysis.include, ["app/**/*.py"])
             self.assertEqual(cfg.analysis.min_confidence, 0.8)
 
-            # Test safe_dict redacts secret
+            # Test safe_dict redacts secret and absolute host paths
             safe = cfg.safe_dict()
             self.assertEqual(safe["server"]["auth_password"], "******")
             self.assertEqual(safe["server"]["auth_username"], "admin")
+            self.assertEqual(safe["server"]["scan_roots"], ["one"])
+            self.assertEqual(safe["server"]["audit_log"], "audit.jsonl")
+            self.assertNotIn("/srv/repos/one", json.dumps(safe))
+            self.assertNotIn("/var/log/secdiagram", json.dumps(safe))
 
     def test_env_var_overrides(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -74,6 +95,11 @@ class ConfigTests(unittest.TestCase):
                 "SECDIAGRAM_AUTH_USER": "ci-agent",
                 "SECDIAGRAM_AUTH_PASS": "ci-token-xyz",
                 "SECDIAGRAM_READ_ONLY": "true",
+                "SECDIAGRAM_INSECURE_NO_AUTH": "true",
+                "SECDIAGRAM_MAX_REQUEST_BYTES": "8192",
+                "SECDIAGRAM_RATE_LIMIT_PER_MINUTE": "30",
+                "SECDIAGRAM_MAX_CONCURRENT_SCANS": "3",
+                "SECDIAGRAM_AUDIT_LOG": "audit.jsonl",
             }
             with mock.patch.dict(os.environ, env):
                 cfg = load_config(root)
@@ -84,6 +110,11 @@ class ConfigTests(unittest.TestCase):
                 self.assertEqual(cfg.server.auth_password, "ci-token-xyz")
                 self.assertTrue(cfg.server.read_only)
                 self.assertTrue(cfg.server.is_auth_enabled())
+                self.assertTrue(cfg.server.insecure_no_auth)
+                self.assertEqual(cfg.server.max_request_bytes, 8192)
+                self.assertEqual(cfg.server.rate_limit_per_minute, 30)
+                self.assertEqual(cfg.server.max_concurrent_scans, 3)
+                self.assertEqual(cfg.server.audit_log, "audit.jsonl")
 
 
 if __name__ == "__main__":

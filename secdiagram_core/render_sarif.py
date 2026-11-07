@@ -18,6 +18,36 @@ SECURITY_SEVERITY = {
 }
 INFORMATION_URI = "https://github.com/vichhaiyserey/secdiagram"
 
+SEVERITY_RANK_VALUE = {
+    "critical": 100,
+    "high": 80,
+    "medium": 50,
+    "low": 20,
+    "info": 0,
+}
+
+CATEGORY_OWASP = {
+    "command": ("A05:2025", "A03:2021"),
+    "code": ("A05:2025", "A03:2021"),
+    "deserialization": ("A08:2025", "A08:2021"),
+    "sql": ("A05:2025", "A03:2021"),
+    "path": ("A01:2025", "A01:2021"),
+    "network": ("A01:2025", "A10:2021"),
+    "crypto": ("A04:2025", "A02:2021"),
+    "template": ("A05:2025", "A03:2021"),
+    "xss": ("A05:2025", "A03:2021"),
+    "xxe": ("A05:2025", "A05:2021"),
+    "redirect": ("A01:2025", "A01:2021"),
+    "auth": ("A07:2025", "A07:2021"),
+    "misconfig": ("A02:2025", "A05:2021"),
+    "secret": ("A02:2025", "A07:2021"),
+    "container": ("A02:2025", "A05:2021"),
+    "cloud": ("A02:2025", "A05:2021"),
+    "ci": ("A03:2025", "A08:2021"),
+    "supply_chain": ("A03:2025", "A06:2021"),
+    "supply-chain": ("A03:2025", "A06:2021"),
+}
+
 CATEGORY_DESCRIPTIONS = {
     "command": "Request-derived input reaches a process execution sink, which can allow arbitrary command execution.",
     "code": "Request-derived input or dynamic strings reach eval/exec/compile, allowing arbitrary code execution.",
@@ -27,6 +57,11 @@ CATEGORY_DESCRIPTIONS = {
     "network": "Request-derived input controls an outbound destination, enabling server-side request forgery.",
     "crypto": "A weak or insecure cryptographic primitive is used in a security-sensitive context.",
     "template": "Request-derived input is rendered as template source, enabling server-side template injection.",
+    "xss": "Request-derived input reaches an HTML output sink without escaping, enabling cross-site scripting.",
+    "xxe": "An XML parser processes untrusted documents with external entities enabled, enabling file disclosure or SSRF.",
+    "redirect": "Request-derived input controls a redirect target, enabling open redirects and credential theft.",
+    "auth": "Authentication or authorization controls are disabled or weakened.",
+    "misconfig": "A framework or runtime setting weakens the security posture of the application.",
     "secret": "A credential-shaped value is committed to source or configuration and may be exposed to anyone with repository access.",
     "container": "Container configuration weakens isolation and increases the impact of a compromise.",
     "supply-chain": "A dependency or build artifact is not pinned, allowing unexpected upstream changes.",
@@ -94,18 +129,30 @@ def _thread_flow(trace: list[Loc]) -> list[dict[str, Any]]:
     return steps
 
 
+def _rule_key(finding: Finding) -> str:
+    prefix = "" if finding.source == "secdiagram" else f"{finding.source}:"
+    return f"{prefix}{finding.category}:{finding.cwe or ''}"
+
+
 def _rule_properties(finding: Finding, severity: str, confidence: float) -> dict[str, Any]:
     tags = ["security"]
     if finding.cwe and "-" in finding.cwe:
         tags.append(f"external/cwe/cwe-{finding.cwe.split('-', 1)[1]}")
-    return {
+    for owasp in CATEGORY_OWASP.get(finding.category, ()):
+        tags.append(f"external/owasp/owasp-{owasp.lower()}")
+    properties: dict[str, Any] = {
         "tags": tags,
         "precision": _precision(confidence),
         "problem.severity": severity,
         "security-severity": SECURITY_SEVERITY.get(severity, "5.5"),
+        "rank": SEVERITY_RANK_VALUE.get(severity, 50),
         "category": finding.category,
         "cwe": finding.cwe,
+        "source": finding.source,
     }
+    if finding.metadata.get("validation"):
+        properties["validation"] = finding.metadata["validation"]
+    return properties
 
 
 def render_sarif(graph: Graph, skip_baseline: bool = False) -> str:
@@ -117,7 +164,7 @@ def render_sarif(graph: Graph, skip_baseline: bool = False) -> str:
     rule_index: dict[str, int] = {}
     rule_state: dict[str, dict[str, Any]] = {}
     for finding in findings:
-        key = f"{finding.category}:{finding.cwe or ''}"
+        key = _rule_key(finding)
         state = rule_state.get(key)
         if state is None:
             state = {
@@ -137,7 +184,7 @@ def render_sarif(graph: Graph, skip_baseline: bool = False) -> str:
             rules.append(
                 {
                     "id": key,
-                    "name": f"secdiagram/{finding.category}",
+                    "name": f"secdiagram/{finding.source}/{finding.category}",
                     "shortDescription": {"text": finding.title},
                     "fullDescription": {"text": description},
                     "help": {
@@ -156,7 +203,7 @@ def render_sarif(graph: Graph, skip_baseline: bool = False) -> str:
     for key, state in rule_state.items():
         rule = rules[rule_index[key]]
         rule["properties"] = _rule_properties(
-            next(f for f in findings if f"{f.category}:{f.cwe or ''}" == key),
+            next(f for f in findings if _rule_key(f) == key),
             state["severity"],
             state["confidence"],
         )
@@ -166,11 +213,12 @@ def render_sarif(graph: Graph, skip_baseline: bool = False) -> str:
     baseline_file = baseline.get("file", "security.baseline.json")
     results: list[dict[str, Any]] = []
     for finding in findings:
-        key = f"{finding.category}:{finding.cwe or ''}"
+        key = _rule_key(finding)
         result: dict[str, Any] = {
             "ruleId": key,
             "ruleIndex": rule_index[key],
             "level": LEVEL.get(finding.severity, "warning"),
+            "rank": SEVERITY_RANK_VALUE.get(finding.severity, 50),
             "message": {"text": finding.message},
             "partialFingerprints": {"secdiagramFindingId/v1": finding.id},
             "properties": {
@@ -178,8 +226,13 @@ def render_sarif(graph: Graph, skip_baseline: bool = False) -> str:
                 "confidence": finding.confidence,
                 "precision": _precision(finding.confidence),
                 "recommendation": finding.recommendation,
+                "source": finding.source,
             },
         }
+        if finding.external_id:
+            result["properties"]["external_id"] = finding.external_id
+        if finding.metadata.get("validation"):
+            result["properties"]["validation"] = finding.metadata["validation"]
         locations = _dedupe_locations(finding.evidence)
         if not locations and finding.trace:
             locations = [finding.trace[-1]]

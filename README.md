@@ -6,7 +6,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue.svg?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Zero Dependencies](https://img.shields.io/badge/Dependencies-Standard%20Library%20Only-success.svg?style=flat-square)](pyproject.toml)
-[![Tests](https://img.shields.io/badge/Tests-97%2F97%20Passing-brightgreen.svg?style=flat-square)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-210%2F210%20Passing-brightgreen.svg?style=flat-square)](tests/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?style=flat-square&logo=docker&logoColor=white)](Dockerfile)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Cross Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Ubuntu%20%7C%20RHEL%20%7C%20Windows-blueviolet.svg?style=flat-square)](#-100-cross-platform-matrix)
@@ -45,6 +45,7 @@
 - **Self-Contained Interactive HTML Report** (`report.html`): A single, zero-dependency HTML file embedding the full graph, security findings with copyable source snippets, subsystem architecture, diagram sources, filterable dependency tables, data-quality distributions, and dark mode. Use `--mermaid-js <bundle>` for a fully offline report.
 - **AI Architectural & Threat Modeling Reviews**: Integrates with local/containerized **Ollama (Qwen, LLaMA, DeepSeek)** or OpenAI endpoints. The LLM receives the deterministic graph and produces evidence-grounded reviews citing exact `path:line` with zero hallucinations.
 - **Hardened Multi-Stage Container**: Runs securely as an unprivileged non-root user (`secdiagram`, UID `10001`), compatible with Docker, Docker Compose, and rootless Podman on SELinux.
+- **Scale-Ready Indexing**: Content-addressed incremental cache keyed by file hash plus commit metadata, optional stdlib `ProcessPoolExecutor` indexing, bounded per-file memory, and deterministic merge order. Vendored and generated trees are excluded automatically.
 - **100% Deterministic & CI-Ready**: Same codebase produces byte-for-byte identical graphs. Exit codes signal analysis success (`0`), errors (`1`), or security threshold violations (`2`).
 - **Pinned Supply Chain**: Zero runtime dependencies; development tools use exact `==` pins; CI actions use full commit SHAs; container images use exact tags plus `@sha256:` digests; Mermaid CLI is installed from a committed npm lockfile via `npm ci`.
 
@@ -160,7 +161,26 @@ Default outputs are written directly to `<repo>/.secdiagram/`:
 
 ---
 
-### 2. Native CLI Installation
+### 2. Large Repositories (Incremental Cache & Parallel Indexing)
+
+```bash
+# Reuse per-file AST/Java indexes between runs (cache lives in <out>/cache):
+secdiagram --dir /path/to/large-repo --jobs 8
+
+# Pick a shared cache location, or disable caching for a one-off clean run:
+secdiagram --dir /path/to/large-repo --cache-dir ~/.cache/secdiagram --jobs 8
+secdiagram --dir /path/to/large-repo --no-cache --jobs 1
+```
+
+- Cache entries are keyed by the **SHA-256 of each source file** and store the repository commit as metadata, so unchanged files are reused across commits while changed files are re-indexed.
+- `--jobs 0` (default) stays serial on small repositories and automatically uses bounded workers for larger ones; `--jobs N` forces a worker count and `--jobs 1` is fully serial.
+- Parallel results are merged in sorted repository order, so `graph.json`, reports, and security outputs remain byte-for-byte deterministic.
+- Vendored (`vendor/`, `third_party/`, `Pods/`, ...), generated (`generated/`, `*_pb2.py`, `*.g.dart`, ...), coverage, and build directories are excluded during discovery.
+- Source files larger than **5 MiB** are skipped with a recorded parse error to bound memory; JSON output is streamed directly to disk.
+
+---
+
+### 3. Native CLI Installation
 
 ```bash
 # Clone the repository:
@@ -279,6 +299,55 @@ secdiagram --format json,md,mermaid,png,svg,pdf
 - **Terraform**: S3 buckets with public read/write ACLs, unrestricted security group ingress (`0.0.0.0/0`).
 - **GitHub Actions**: Workflows using `pull_request_target` with explicit checkouts, untrusted script execution.
 
+### External Scanner Import (SonarQube & JFrog Xray)
+
+Merge existing scanner evidence into the deterministic graph and SARIF output. Reports
+are local JSON only, bounded in size, and every external finding keeps its provenance
+(`source`, `external_id`, rule/CVE/package metadata) plus a repository `path:line`
+anchor when one is available.
+
+```bash
+# Import SonarQube issues and Xray violations, then validate CVEs against CISA KEV:
+python secdiagram.py --sonarqube-report sonar-issues.json \
+  --xray-report xray-violations.json \
+  --advisory-db cisa-kev.json --format json,md,sarif
+
+# Advisory databases may also be directories of JSON files; NVD and OSV exports work too:
+python secdiagram.py --xray-report xray.json --advisory-db advisories/
+```
+
+- **SonarQube**: tolerates both `{"issues": [...]}` exports and bare issue arrays. Security
+  vulnerabilities/hotspots are imported; code smells and closed/false-positive/won't-fix
+  issues are skipped. `impacts`, CWE, tags, rule, status, and effort are preserved.
+- **JFrog Xray**: accepts `violations` wrappers or component/artifact maps. Vulnerable
+  package, version, CVSS, fixed versions, CVE list, references, and policy/watch are kept.
+- **Advisory validation**: local **CISA KEV**, **NVD**, **OSV**, or generic CVE maps corroborate
+  imported CVEs. KEV matches force `critical` severity and `0.98` confidence; multi-source
+  matches raise confidence to `0.97`. No network request is made.
+- Imported findings participate in severity thresholds, baselines, Markdown/HTML, LLM evidence
+  packs, and SARIF (`sonarqube:external:*` / `xray:external:*` rules with validation metadata).
+
+### Standalone Security Review (`--security-report`)
+
+Generate a print-first security artifact that is separate from the architecture report:
+
+```bash
+python secdiagram.py --dir . --security-report both --format sarif --fail-on high
+```
+
+This writes:
+
+- `security-report.html` - static, A4-printable review with no CDN or JavaScript dependency.
+- `SECURITY_REVIEW.md` - the same review in reviewable Markdown.
+- `security.sarif` - unchanged machine-readable export when `--format sarif` is selected.
+
+The report includes a gate verdict, transparent risk index
+(`min(100, 20*critical + 8*high + 3*medium + 1*low)`, new findings only; the label floors at High for any critical finding and Moderate for any high finding), attack-surface
+summary, prioritized findings with `path:line` evidence and taint paths, dependency/CVE
+provenance, advisory validation, remediation roadmap, coverage, and explicit limitations.
+Baseline-suppressed findings are excluded from the risk index but remain in the evidence
+appendix. Output is deterministic and ASCII-safe.
+
 ---
 
 ## 🤖 AI Architectural Reviews (Ollama & Qwen)
@@ -291,7 +360,15 @@ python secdiagram.py --ollama qwen2.5-coder
 
 # Choose a specialized architectural review template:
 python secdiagram.py --ollama qwen2.5-coder --llm-template comprehensive
+
+# Tune the evidence budget for small-context local models:
+python secdiagram.py --ollama qwen2.5-coder --llm-context-chars 20000
 ```
+
+Ollama requests use the native `/api/chat` endpoint with a fixed seed, `num_ctx`,
+`num_predict`, and a deterministic evidence pack that prioritizes critical/high
+findings and taint traces. Point `--llm-base-url` at a `/v1` URL (or set
+`SECDIAGRAM_OLLAMA_API=openai`) to keep using Ollama's OpenAI-compatible endpoint.
 
 ### 4 Specialized Review Profiles (`--llm-template`):
 
@@ -319,6 +396,68 @@ python secdiagram.py --ollama qwen2.5-coder --llm-template comprehensive
 
 ---
 
+## 🖥️ Platform Server & REST API (Hardened)
+
+Serve the interactive report and a read/write REST API without any third-party
+runtime dependency:
+
+```bash
+# Recommended: authenticated, loopback-only server
+secdiagram serve --dir . --user analyst --password 'change-me'
+
+# Local-only development without auth (explicitly insecure):
+secdiagram serve --dir . --insecure-no-auth
+
+# Deliberate remote bind: authentication is mandatory
+secdiagram serve --dir . --host 0.0.0.0 --user analyst --password 'change-me'
+```
+
+Secure defaults and limits:
+
+- Binds to `127.0.0.1` unless `--host` is supplied explicitly.
+- Authentication is **required**, including on loopback. `--insecure-no-auth`
+  is the only way to disable it and is rejected for non-loopback binds.
+- Per-client rate limiting (`--rate-limit`, default 240/min; `0` disables),
+  bounded request bodies (`--max-request-bytes`, default 1 MiB), and bounded
+  concurrent scans (`--max-concurrent-scans`, default 1, excess scans get `429`).
+- Scans are restricted to the served repository and any `--scan-root`
+  allowlist entries. Paths supplied by an HTTP client are rejected unless they
+  resolve exactly to an allowlisted root.
+- Structured JSON audit events are written to stderr or `--audit-log FILE` for
+  authentication failures, scan requests/results, rejected paths, rate limits,
+  SARIF downloads, and server start/stop. Secrets and absolute host paths are
+  redacted.
+- API responses, logs, `graph.json`, and HTML reports never include credentials,
+  environment variables, or absolute host paths; embedded source snippets are
+  scrubbed of credential-shaped values.
+
+Configuration can also live in `secdiagram.config.json`:
+
+```json
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "auth_mode": "basic",
+    "auth_username": "analyst",
+    "auth_password": "change-me",
+    "read_only": false,
+    "max_request_bytes": 1048576,
+    "rate_limit_per_minute": 240,
+    "max_concurrent_scans": 1,
+    "scan_roots": ["."],
+    "audit_log": "audit.jsonl"
+  }
+}
+```
+
+> [!WARNING]
+> The server speaks plain HTTP. For any remote deployment, terminate TLS at a
+> trusted reverse proxy, keep Basic Auth enabled, and restrict network access.
+> Prefer `read_only: true` when the API only needs to serve existing results.
+
+---
+
 ## 🌐 100% Cross-Platform Matrix
 
 `secdiagram` runs seamlessly across all major operating systems, shells, and enterprise server environments:
@@ -338,8 +477,13 @@ python secdiagram.py --ollama qwen2.5-coder --llm-template comprehensive
 usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
                   [--include GLOB] [--exclude GLOB]
                   [--min-confidence MIN_CONFIDENCE] [--max-nodes MAX_NODES]
+                  [--jobs N] [--cache-dir PATH] [--no-cache]
                   [--min-finding-confidence SCORE]
-                  [--security] [--no-security] [--link-base LINK_BASE]
+                  [--security] [--no-security]
+                  [--security-report {html,md,both}]
+                  [--sonarqube-report PATH] [--xray-report PATH]
+                  [--advisory-db PATH]
+                  [--link-base LINK_BASE]
                   [--image [FORMAT]] [--image-format {png,svg,pdf}]
                   [--image-provider {auto,local,kroki,mermaid.ink}]
                   [--image-endpoint IMAGE_ENDPOINT] [--offline]
@@ -352,6 +496,7 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
                   [--llm-base-url LLM_BASE_URL] [--llm-api-key LLM_API_KEY]
                   [--llm-template {comprehensive,threat-model,remediation,compliance}]
                   [--llm-timeout LLM_TIMEOUT] [--llm-max-tokens LLM_MAX_TOKENS]
+                  [--llm-context-chars LLM_CONTEXT_CHARS]
                   [--fail-on {critical,high,medium,low,info,none}]
                   [--baseline FILE] [--create-baseline]
                   [--quiet] [--version]
@@ -373,24 +518,32 @@ usage: secdiagram [-h] [--dir DIR] [--out OUT] [--format FORMAT]
 | `--diagram-direction`| `LR` | Diagram orientation: `LR` (horizontal) or `TB` (top-to-bottom) |
 | `--diagram-theme` | `modern` | Visual theme palette: `modern` (Tailwind) or `classic` |
 | `--link-base URL` | `None` | Prefix for clickable source links (e.g. `https://github.com/org/repo/blob/main`) |
+| `--jobs N` | `0` (auto) | Parallel indexer processes; `0` auto-tunes, `1` forces serial execution |
+| `--cache-dir PATH` | `<out>/cache` | Incremental per-file index cache keyed by content hash |
+| `--no-cache` | `false` | Disable the index cache for this run |
 | `--security / --no-security` | enabled | Toggle SAST security rules and IaC configuration checks |
+| `--security-report {html,md,both}` | `none` | Write a standalone `security-report.html` and/or `SECURITY_REVIEW.md` |
+| `--sonarqube-report PATH` | `none` | Import a SonarQube issues JSON export as security findings |
+| `--xray-report PATH` | `none` | Import JFrog Xray violations JSON as dependency findings |
+| `--advisory-db PATH` | `none` | Validate imported CVEs against a local CISA KEV/NVD/OSV JSON file or directory (repeatable) |
 | `--min-confidence SCORE` | `0.5` | Drop call/inheritance edges below this confidence |
 | `--min-finding-confidence SCORE` | `0.0` | Drop security findings below this confidence (`0.0`-`1.0`); the applied floor is recorded in reports |
 | `--fail-on SEVERITY` | `none` | Return exit code `2` if findings meet or exceed severity threshold |
 | `--baseline FILE` | `none` | Suppress findings listed in `security.baseline.json` so CI fails only on NEW findings; report artifacts note the suppressed counts |
 | `--create-baseline` | `false` | Generate `security.baseline.json` from the current scan (path from `--baseline`, default `<out>/security.baseline.json`) and exit `0` |
-| `--ollama [MODEL]` | `qwen2.5-coder` | Generate AI review using local Ollama (`qwen2.5-coder`, `qwen2.5:7b`, etc.) |
+| `--ollama [MODEL]` | `qwen2.5-coder` | Generate AI review using local Ollama's native `/api/chat` endpoint (`qwen2.5-coder`, `qwen2.5:7b`, etc.) |
 | `--llm-template` | `comprehensive` | Prompt profile: `comprehensive`, `threat-model`, `remediation`, `compliance` |
 | `--llm-timeout` | `300s` (Ollama) | Network timeout in seconds for LLM generation |
 | `--llm-max-tokens` | `1500` | Maximum completion tokens generated by the model |
+| `--llm-context-chars` | auto | Maximum graph evidence characters sent to the LLM; auto-sized to the model context |
 | `--quiet` | `false` | Suppress console summary output |
-| `--version` | — | Display program version (`secdiagram 0.1.0`) |
+| `--version` | — | Display program version (`secdiagram 0.2.0`) |
 
 ---
 
 ## 🧪 Comprehensive Test Suite
 
-`secdiagram` includes 134 unit tests covering AST discovery, call resolution, polyglot .NET, Java/Spring, and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, supply-chain pinning, and deterministic CLI behaviors:
+`secdiagram` includes 210 unit tests covering AST discovery, call resolution, polyglot .NET, Java/Spring, and Node.js manifests, high-level C4 diagram rendering, security heuristics, image renderers, supply-chain pinning, and deterministic CLI behaviors:
 
 ```bash
 # Run all unit tests:
@@ -398,7 +551,7 @@ python -m unittest
 ```
 
 ```text
-Ran 97 tests in 6.933s
+Ran 210 tests in 11.801s
 OK
 ```
 

@@ -5,8 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .advisories import apply_advisories, load_advisories
 from .ast_index import index_repo
+from .cache import IndexCache
 from .discover import RepoInfo, discover
+from .external_reports import load_external_reports
 from .features import assign_features
 from .frameworks import annotate
 from .graph_builder import BuildStats, GraphBuilder
@@ -52,6 +55,11 @@ class AnalysisConfig:
     min_confidence: float = 0.5
     max_nodes: int = 2000
     security: bool = True
+    sonarqube_report: Path | None = None
+    xray_report: Path | None = None
+    advisory_dbs: list[Path] = field(default_factory=list)
+    jobs: int = 0
+    cache_dir: Path | None = None
 
 
 @dataclass(slots=True)
@@ -62,18 +70,26 @@ class AnalysisResult:
     python_files: int
     parse_errors: list[str] = field(default_factory=list)
     java_files: int = 0
+    cache_stats: dict[str, dict[str, int | bool | str]] = field(default_factory=dict)
 
 
 def run_analysis(config: AnalysisConfig) -> AnalysisResult:
-    repo = discover(config.root, config.include, config.exclude)
-    indexes = index_repo(repo.root, repo.python_files)
+    repo = discover(
+        config.root,
+        config.include,
+        config.exclude,
+        skip_paths=[config.cache_dir] if config.cache_dir is not None else None,
+    )
+    python_cache = IndexCache(config.cache_dir, "python", repo.commit) if config.cache_dir else None
+    java_cache = IndexCache(config.cache_dir, "java", repo.commit) if config.cache_dir else None
+    indexes = index_repo(repo.root, repo.python_files, jobs=config.jobs, cache=python_cache)
     annotate(indexes)
 
     resolver = Resolver(indexes)
     builder = GraphBuilder(indexes, resolver, max_nodes=config.max_nodes)
     graph = builder.build()
 
-    java_index = index_java(repo.root, repo.rel_files)
+    java_index = index_java(repo.root, repo.rel_files, jobs=config.jobs, cache=java_cache)
     if java_index.files:
         build_java_graph(graph, java_index)
 
@@ -83,10 +99,24 @@ def run_analysis(config: AnalysisConfig) -> AnalysisResult:
         findings.extend(analyze_security(graph, indexes, resolver, repo.root, repo.rel_files))
         if java_index.files:
             findings.extend(analyze_java_security(graph, java_index, repo.root, repo.name))
+        external, external_summaries = load_external_reports(
+            repo.root,
+            repo.rel_files,
+            config.sonarqube_report,
+            config.xray_report,
+        )
+        findings.extend(external)
+        if external_summaries:
+            graph.meta["external_reports"] = external_summaries
     merged: dict[str, Finding] = {}
     for finding in findings:
         merged.setdefault(finding.id, finding)
     graph.findings = list(merged.values())
+    if config.advisory_dbs:
+        advisory_index, advisory_summaries = load_advisories(config.advisory_dbs)
+        validated = apply_advisories(graph.findings, advisory_index)
+        graph.meta["advisory_sources"] = advisory_summaries
+        graph.meta["advisory_validated_findings"] = validated
     graph.edges = [
         edge
         for edge in graph.edges
@@ -133,6 +163,7 @@ def run_analysis(config: AnalysisConfig) -> AnalysisResult:
             "security_languages": list(SECURITY_LANGUAGES),
             "unsupported_security_languages": unsupported_languages,
             "config_hash": config_hash,
+            "security_enabled": config.security,
             "include": sorted(config.include),
             "exclude": sorted(config.exclude),
             "min_confidence": config.min_confidence,
@@ -144,6 +175,11 @@ def run_analysis(config: AnalysisConfig) -> AnalysisResult:
             },
         }
     )
+    cache_stats: dict[str, dict[str, int | bool | str]] = {}
+    if python_cache is not None:
+        cache_stats["python"] = python_cache.summary()
+    if java_cache is not None:
+        cache_stats["java"] = java_cache.summary()
     return AnalysisResult(
         repo=repo,
         graph=graph,
@@ -151,4 +187,5 @@ def run_analysis(config: AnalysisConfig) -> AnalysisResult:
         python_files=len(indexes),
         parse_errors=parse_errors,
         java_files=len(java_index.files),
+        cache_stats=cache_stats,
     )

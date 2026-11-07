@@ -21,6 +21,7 @@ from typing import Any
 from . import SCHEMA_VERSION, __version__
 from .high_level import HighLevelArchitecture
 from .model import Finding, Graph
+from .redaction import redact_snippet_line
 
 MERMAID_CDN = "https://cdn.jsdelivr.net/npm/mermaid@11.12.0/dist/mermaid.min.js"
 MERMAID_STUB_FALLBACK = (
@@ -108,7 +109,7 @@ def _snippet_maps(root: Path, findings: list[Finding]) -> dict[str, dict[str, An
         collected: list[list[Any]] = []
         for number in sorted(windows[path]):
             if number <= len(file_lines):
-                collected.append([number, file_lines[number - 1][:400]])
+                collected.append([number, redact_snippet_line(file_lines[number - 1][:400])])
         if collected:
             snippets[path] = {"lines": collected}
     return snippets

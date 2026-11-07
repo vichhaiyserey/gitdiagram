@@ -112,6 +112,7 @@ jobs:
           scanners: vuln,secret,misconfig
           severity: CRITICAL,HIGH
           format: sarif
+          limit-severities-for-sarif: true
           output: trivy-fs.sarif
           exit-code: "1"
           ignore-unfixed: true

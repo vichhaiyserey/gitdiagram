@@ -396,6 +396,68 @@ findings and taint traces. Point `--llm-base-url` at a `/v1` URL (or set
 
 ---
 
+## 🖥️ Platform Server & REST API (Hardened)
+
+Serve the interactive report and a read/write REST API without any third-party
+runtime dependency:
+
+```bash
+# Recommended: authenticated, loopback-only server
+secdiagram serve --dir . --user analyst --password 'change-me'
+
+# Local-only development without auth (explicitly insecure):
+secdiagram serve --dir . --insecure-no-auth
+
+# Deliberate remote bind: authentication is mandatory
+secdiagram serve --dir . --host 0.0.0.0 --user analyst --password 'change-me'
+```
+
+Secure defaults and limits:
+
+- Binds to `127.0.0.1` unless `--host` is supplied explicitly.
+- Authentication is **required**, including on loopback. `--insecure-no-auth`
+  is the only way to disable it and is rejected for non-loopback binds.
+- Per-client rate limiting (`--rate-limit`, default 240/min; `0` disables),
+  bounded request bodies (`--max-request-bytes`, default 1 MiB), and bounded
+  concurrent scans (`--max-concurrent-scans`, default 1, excess scans get `429`).
+- Scans are restricted to the served repository and any `--scan-root`
+  allowlist entries. Paths supplied by an HTTP client are rejected unless they
+  resolve exactly to an allowlisted root.
+- Structured JSON audit events are written to stderr or `--audit-log FILE` for
+  authentication failures, scan requests/results, rejected paths, rate limits,
+  SARIF downloads, and server start/stop. Secrets and absolute host paths are
+  redacted.
+- API responses, logs, `graph.json`, and HTML reports never include credentials,
+  environment variables, or absolute host paths; embedded source snippets are
+  scrubbed of credential-shaped values.
+
+Configuration can also live in `secdiagram.config.json`:
+
+```json
+{
+  "server": {
+    "host": "127.0.0.1",
+    "port": 8080,
+    "auth_mode": "basic",
+    "auth_username": "analyst",
+    "auth_password": "change-me",
+    "read_only": false,
+    "max_request_bytes": 1048576,
+    "rate_limit_per_minute": 240,
+    "max_concurrent_scans": 1,
+    "scan_roots": ["."],
+    "audit_log": "audit.jsonl"
+  }
+}
+```
+
+> [!WARNING]
+> The server speaks plain HTTP. For any remote deployment, terminate TLS at a
+> trusted reverse proxy, keep Basic Auth enabled, and restrict network access.
+> Prefer `read_only: true` when the API only needs to serve existing results.
+
+---
+
 ## 🌐 100% Cross-Platform Matrix
 
 `secdiagram` runs seamlessly across all major operating systems, shells, and enterprise server environments:

@@ -352,6 +352,46 @@ def build_parser() -> argparse.ArgumentParser:
         help="disallow re-scans via the platform REST API",
     )
     parser.add_argument(
+        "--server-insecure-no-auth",
+        action="store_true",
+        default=False,
+        help="allow unauthenticated access in loopback-only development mode (never for remote binds)",
+    )
+    parser.add_argument(
+        "--server-max-request-bytes",
+        type=int,
+        default=None,
+        metavar="BYTES",
+        help="maximum accepted HTTP request body size (default: 1048576)",
+    )
+    parser.add_argument(
+        "--server-rate-limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="maximum requests per client per minute (default: 240, 0 disables)",
+    )
+    parser.add_argument(
+        "--server-max-concurrent-scans",
+        type=int,
+        default=None,
+        metavar="N",
+        help="maximum concurrent API-triggered scans (default: 1)",
+    )
+    parser.add_argument(
+        "--server-scan-root",
+        action="append",
+        default=None,
+        metavar="DIR",
+        help="allowlisted scan directory (repeatable; default: served repository root)",
+    )
+    parser.add_argument(
+        "--server-audit-log",
+        default=None,
+        metavar="FILE",
+        help="append structured audit events to FILE (default: stderr)",
+    )
+    parser.add_argument(
         "--config",
         default=None,
         metavar="FILE",
@@ -405,6 +445,46 @@ def server_main(argv: list[str] | None = None) -> int:
     parser.add_argument("--user", default=None, help="HTTP Basic Auth username")
     parser.add_argument("--password", default=None, help="HTTP Basic Auth password")
     parser.add_argument("--read-only", action="store_true", default=False, help="disallow API-triggered scans")
+    parser.add_argument(
+        "--insecure-no-auth",
+        action="store_true",
+        default=False,
+        help="allow unauthenticated access in loopback-only development mode",
+    )
+    parser.add_argument(
+        "--max-request-bytes",
+        type=int,
+        default=None,
+        metavar="BYTES",
+        help="maximum accepted HTTP request body size (default: 1048576)",
+    )
+    parser.add_argument(
+        "--rate-limit",
+        type=int,
+        default=None,
+        metavar="N",
+        help="maximum requests per client per minute (default: 240, 0 disables)",
+    )
+    parser.add_argument(
+        "--max-concurrent-scans",
+        type=int,
+        default=None,
+        metavar="N",
+        help="maximum concurrent API-triggered scans (default: 1)",
+    )
+    parser.add_argument(
+        "--scan-root",
+        action="append",
+        default=None,
+        metavar="DIR",
+        help="allowlisted scan directory (repeatable; default: served repository root)",
+    )
+    parser.add_argument(
+        "--audit-log",
+        default=None,
+        metavar="FILE",
+        help="append structured audit events to FILE (default: stderr)",
+    )
     parser.add_argument("--config", default=None, help="configuration file path")
     args = parser.parse_args(argv)
     from .server import serve
@@ -418,6 +498,12 @@ def server_main(argv: list[str] | None = None) -> int:
         auth_password=args.password,
         read_only=args.read_only,
         config_path=cfg_path,
+        insecure_no_auth=args.insecure_no_auth,
+        max_request_bytes=args.max_request_bytes,
+        rate_limit_per_minute=args.rate_limit,
+        max_concurrent_scans=args.max_concurrent_scans,
+        scan_roots=args.scan_root,
+        audit_log=args.audit_log,
     )
 
 
@@ -444,6 +530,12 @@ def main(argv: list[str] | None = None) -> int:
             auth_password=args.server_pass,
             read_only=args.server_read_only,
             config_path=cfg_path,
+            insecure_no_auth=args.server_insecure_no_auth,
+            max_request_bytes=args.server_max_request_bytes,
+            rate_limit_per_minute=args.server_rate_limit,
+            max_concurrent_scans=args.server_max_concurrent_scans,
+            scan_roots=args.server_scan_root,
+            audit_log=args.server_audit_log,
         )
 
     out = _normalize_cli_path(args.out) if args.out else root / ".secdiagram"

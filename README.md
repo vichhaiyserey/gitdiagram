@@ -184,8 +184,8 @@ secdiagram --dir /path/to/large-repo --no-cache --jobs 1
 
 ```bash
 # Clone the repository:
-git clone https://github.com/vichhaiyserey/gitgendiagram.git
-cd gitgendiagram
+git clone https://github.com/vichhaiyserey/secdiagram.git
+cd secdiagram
 
 # Install in editable mode:
 pip install -e .
